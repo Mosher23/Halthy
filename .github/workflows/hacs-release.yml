@@ -1,0 +1,38 @@
+name: Build HACS release package
+
+on:
+  release:
+    types:
+      - published
+      - edited
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package integration from Integration folder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build HACS release zip
+        id: build_package
+        run: |
+          set -euo pipefail
+          rm -rf dist halthy_bridge.zip
+          mkdir -p dist/custom_components
+          cp -R custom_components/. dist/custom_components/
+          cp dist/custom_components/halthy_bridge/README.md dist/README.md || true
+          (
+            cd dist
+            zip -r ../halthy_bridge.zip .
+          )
+          echo "package_name=halthy_bridge.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Attach package to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.build_package.outputs.package_name }}
+          fail_on_unmatched_files: false

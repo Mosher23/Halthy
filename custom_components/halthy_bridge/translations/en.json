@@ -1,0 +1,31 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "Configure one app username for this bridge entry.",
+        "data": {
+          "app_username": "App username",
+          "name": "Display name (optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Enter a valid username."
+    },
+    "abort": {
+      "already_configured": "This app username is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Halthy Options",
+        "description": "Choose how temperature values are exposed to Home Assistant.",
+        "data": {
+          "temperature_unit": "Temperature unit"
+        }
+      }
+    }
+  }
+}
