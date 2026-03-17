@@ -54,7 +54,7 @@ For richer historical analysis, enable optional InfluxDB export. That path sends
 
 1. Open **HACS** in Home Assistant.
 2. Go to **Integrations** → **...** → **+ Explore & download repositories**.
-3. Add repository `https://github.com/sergii-tsiapenko/halthy` and choose **Integration**.
+3. Add repository `https://github.com/Mosher23/Halthy-Bridge` and choose **Integration**.
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & Services → Add Integration**.
 6. Select **Halthy Bridge**.
@@ -66,7 +66,7 @@ For richer historical analysis, enable optional InfluxDB export. That path sends
 
 ### Manual install (alternative)
 
-1. Copy `custom_components/halthy_bridge` into `<config>/custom_components/`.
+1. Copy `custom_components/halthy` into `<config>/custom_components/`.
 2. Restart Home Assistant.
 3. Add the integration as above.
 
