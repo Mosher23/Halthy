@@ -1,4 +1,4 @@
-"""Image platform for Halthy bridge."""
+"""Image platform for Halthy."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BridgeImageState, IntegrationRuntime
+from . import HalthyImageState, IntegrationRuntime
 from .const import (
     DOMAIN,
     MANUFACTURER,
@@ -32,7 +32,7 @@ async def async_setup_entry(
     """Set up bridge images from config entry."""
     domain_data = hass.data[DOMAIN]
     runtime: IntegrationRuntime = domain_data["entries"][entry.entry_id]
-    entities: dict[str, HalthyBridgeImage] = {}
+    entities: dict[str, HalthyImage] = {}
 
     # Clean up stale image entities that were left in the registry but are no longer
     # present in runtime storage (for example after unique-id or routing changes).
@@ -53,7 +53,7 @@ async def async_setup_entry(
             return
         if unique_id not in runtime.images:
             return
-        entity = HalthyBridgeImage(
+        entity = HalthyImage(
             hass=hass,
             runtime=runtime,
             entry_id=entry.entry_id,
@@ -69,7 +69,7 @@ async def async_setup_entry(
     entry.async_on_unload(remove_listener)
 
 
-class HalthyBridgeImage(ImageEntity):
+class HalthyImage(ImageEntity):
     """Represents a dynamically-created image pushed from the iOS app."""
 
     _attr_has_entity_name = False
@@ -100,7 +100,7 @@ class HalthyBridgeImage(ImageEntity):
         self._apply_state(self._image_state)
 
     @callback
-    def _apply_state(self, state: BridgeImageState) -> None:
+    def _apply_state(self, state: HalthyImageState) -> None:
         self._image_state = state
         self._attr_name = state.name
         self._attr_content_type = state.content_type

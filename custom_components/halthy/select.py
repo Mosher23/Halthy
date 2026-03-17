@@ -1,4 +1,4 @@
-"""Select platform for Halthy bridge."""
+"""Select platform for Halthy."""
 
 from __future__ import annotations
 

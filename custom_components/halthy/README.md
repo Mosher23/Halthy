@@ -1,4 +1,4 @@
-# Halthy Bridge
+# Halthy
 
 Halthy is a local, peer-to-peer bridge that sends selected HealthKit metrics from your iPhone to Home Assistant.
 
@@ -6,7 +6,7 @@ The iOS app reads data from HealthKit and pushes it directly to Home Assistant o
 
 ## Features
 
-- Direct upload from iPhone to Home Assistant (`/api/halthy_bridge/push`)
+- Direct upload from iPhone to Home Assistant (`/api/halthy/push`)
 - Per-person setup with stable entity IDs and unique identifiers
 - Optional background sync
 - Optional raw HealthKit export to InfluxDB for advanced graphs in Grafana
@@ -17,7 +17,7 @@ The iOS app reads data from HealthKit and pushes it directly to Home Assistant o
 ## How it works
 
 1. The Home Assistant integration exposes a secure endpoint in Home Assistant itself:
-   - `POST /api/halthy_bridge/push`
+   - `POST /api/halthy/push`
 2. The app collects selected HealthKit metrics and optional workout route images.
 3. The app sends them in a single POST with:
    - your configured app username
@@ -51,10 +51,10 @@ For richer historical analysis, enable optional InfluxDB export. That path sends
 
 1. Open **HACS** in Home Assistant.
 2. Go to **Integrations** → **...** → **+ Explore & download repositories**.
-3. Add repository `https://github.com/Mosher23/Halthy-Bridge` and choose **Integration**.
+3. Add repository `https://github.com/sergii-tsiapenko/halthy` and choose **Integration**.
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & Services → Add Integration**.
-6. Select **Halthy Bridge**.
+6. Select **Halthy**.
 7. Enter:
    - **App Username** (must match what you configure in the iOS app)
    - Optional **Display Name**
@@ -63,7 +63,7 @@ For richer historical analysis, enable optional InfluxDB export. That path sends
 
 ### Manual install (alternative)
 
-1. Copy `custom_components/halthy_bridge` into `<config>/custom_components/`.
+1. Copy `custom_components/halthy` into `<config>/custom_components/`.
 2. Restart Home Assistant.
 3. Add the integration as above.
 

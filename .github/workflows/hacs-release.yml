@@ -21,15 +21,15 @@ jobs:
         id: build_package
         run: |
           set -euo pipefail
-          rm -rf dist halthy_bridge.zip
+          rm -rf dist halthy.zip
           mkdir -p dist/custom_components
           cp -R custom_components/. dist/custom_components/
-          cp dist/custom_components/halthy_bridge/README.md dist/README.md || true
+          cp dist/custom_components/halthy/README.md dist/README.md || true
           (
             cd dist
-            zip -r ../halthy_bridge.zip .
+            zip -r ../halthy.zip .
           )
-          echo "package_name=halthy_bridge.zip" >> "$GITHUB_OUTPUT"
+          echo "package_name=halthy.zip" >> "$GITHUB_OUTPUT"
 
       - name: Attach package to release
         uses: softprops/action-gh-release@v1

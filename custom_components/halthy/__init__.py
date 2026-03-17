@@ -1,4 +1,4 @@
-"""Halthy bridge integration."""
+"""Halthy integration."""
 
 from __future__ import annotations
 
@@ -25,8 +25,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import config_validation as cv
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 try:
     from homeassistant.components.recorder.statistics import async_add_external_statistics
@@ -52,10 +53,15 @@ except ImportError:
         StatisticMetaData = None  # type: ignore[assignment]
 
 from .const import (
+    ACTIVITY_LOG_MODE_OFF,
+    ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
+    ACTIVITY_LOG_MODE_SESSION_SUMMARY,
     CONF_APP_USERNAME,
+    CONF_ACTIVITY_LOG_MODE,
     CONF_DISPLAY_NAME,
     CONF_OWNER_USER_ID,
     CONF_TEMPERATURE_UNIT,
+    DEFAULT_ACTIVITY_LOG_MODE,
     DEFAULT_TEMPERATURE_UNIT,
     DOMAIN,
     COMMAND_ACK_ENDPOINT_NAME,
@@ -66,6 +72,8 @@ from .const import (
     ENDPOINT_PATH,
     PLATFORMS,
     SERVICE_FORCE_UPLOAD,
+    SERVICE_FORCE_INFLUX_BACKFILL,
+    VALID_ACTIVITY_LOG_MODES,
     VALID_TEMPERATURE_UNITS,
     new_image_signal,
     new_sensor_signal,
@@ -97,8 +105,16 @@ MAX_IMAGE_BYTES = 350 * 1024
 LAST_UPDATE_METRIC_KEY = "last_update"
 LAST_UPDATE_NAME = "Last update"
 LAST_UPDATE_ICON = "mdi:clock-check-outline"
+DAILY_UPLOAD_COUNT_METRIC_KEY = "daily_upload_count"
+DAILY_UPLOAD_COUNT_NAME = "Daily uploads"
+DAILY_UPLOAD_COUNT_ICON = "mdi:counter"
 STATISTICS_SOURCE = "halthy"
 FORCE_UPLOAD_COMMAND_TYPE = "force_upload"
+FORCE_INFLUX_BACKFILL_COMMAND_TYPE = "force_influx_backfill"
+SUPPORTED_COMMAND_TYPES = {
+    FORCE_UPLOAD_COMMAND_TYPE,
+    FORCE_INFLUX_BACKFILL_COMMAND_TYPE,
+}
 FORCE_UPLOAD_INTERVAL_DEFAULT_SECONDS = 0
 FORCE_UPLOAD_INTERVAL_OPTIONS: tuple[tuple[str, int], ...] = (
     ("Off", 0),
@@ -150,6 +166,35 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _current_local_day_key(hass: HomeAssistant) -> str:
+    return dt_util.now().date().isoformat()
+
+
+def _normalize_day_key(raw_value: Any) -> str:
+    if not isinstance(raw_value, str):
+        return ""
+    candidate = raw_value.strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", candidate):
+        return ""
+    return candidate
+
+
+def _coerce_daily_upload_count(raw_value: Any) -> int:
+    if isinstance(raw_value, bool):
+        return 0
+    if isinstance(raw_value, int):
+        return max(raw_value, 0)
+    if isinstance(raw_value, float):
+        if not math.isfinite(raw_value):
+            return 0
+        return max(int(raw_value), 0)
+    if isinstance(raw_value, str):
+        stripped = raw_value.strip()
+        if stripped.isdigit():
+            return max(int(stripped), 0)
+    return 0
+
+
 def force_upload_interval_label(seconds: int) -> str:
     normalized_seconds = _coerce_force_upload_interval_seconds(seconds)
     for label, option_seconds in FORCE_UPLOAD_INTERVAL_OPTIONS:
@@ -189,6 +234,14 @@ def _coerce_force_upload_interval_seconds(raw_value: Any) -> int:
     return value
 
 
+def _coerce_activity_log_mode(raw_value: Any) -> str:
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip().lower()
+        if normalized in VALID_ACTIVITY_LOG_MODES:
+            return normalized
+    return DEFAULT_ACTIVITY_LOG_MODE
+
+
 def _normalize_pending_force_upload_command(raw_value: Any) -> dict[str, Any] | None:
     if not isinstance(raw_value, dict):
         return None
@@ -197,12 +250,12 @@ def _normalize_pending_force_upload_command(raw_value: Any) -> dict[str, Any] | 
     command_type = str(raw_value.get("type", "")).strip().lower()
     requested_at_raw = str(raw_value.get("requested_at", "")).strip()
     requested_at = _parse_measurement_timestamp(requested_at_raw)
-    if not command_id or command_type != FORCE_UPLOAD_COMMAND_TYPE or requested_at is None:
+    if not command_id or command_type not in SUPPORTED_COMMAND_TYPES or requested_at is None:
         return None
 
     normalized: dict[str, Any] = {
         "id": command_id,
-        "type": FORCE_UPLOAD_COMMAND_TYPE,
+        "type": command_type,
         "requested_at": requested_at.isoformat(),
     }
     requested_by_user_id = str(raw_value.get("requested_by_user_id", "")).strip()
@@ -218,7 +271,7 @@ def _normalize_pending_force_upload_command(raw_value: Any) -> dict[str, Any] | 
 
 
 @dataclass(slots=True)
-class BridgeSensorState:
+class HalthySensorState:
     """In-memory state for one metric-backed sensor."""
 
     unique_id: str
@@ -234,7 +287,7 @@ class BridgeSensorState:
 
 
 @dataclass(slots=True)
-class BridgeImageState:
+class HalthyImageState:
     """In-memory state for one metric-backed image entity."""
 
     unique_id: str
@@ -257,13 +310,16 @@ class IntegrationRuntime:
     display_name: str
     owner_user_id: str | None = None
     temperature_unit_preference: str = DEFAULT_TEMPERATURE_UNIT
-    sensors: dict[str, BridgeSensorState] = field(default_factory=dict)
-    images: dict[str, BridgeImageState] = field(default_factory=dict)
+    activity_log_mode: str = DEFAULT_ACTIVITY_LOG_MODE
+    sensors: dict[str, HalthySensorState] = field(default_factory=dict)
+    images: dict[str, HalthyImageState] = field(default_factory=dict)
     statistics_cursors: dict[str, str] = field(default_factory=dict)
     force_upload_interval_seconds: int = FORCE_UPLOAD_INTERVAL_DEFAULT_SECONDS
     pending_force_upload_command: dict[str, Any] | None = None
     last_force_upload_ack_at: str | None = None
     last_force_upload_ack_status: str | None = None
+    daily_upload_count: int = 0
+    daily_upload_count_day: str = ""
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -398,7 +454,7 @@ def _upsert_last_update_sensor(
         for unique_id in matching_unique_ids:
             existing_state = runtime.sensors.get(unique_id)
             state_device_id = existing_state.device_id if existing_state is not None else "diagnostic"
-            runtime.sensors[unique_id] = BridgeSensorState(
+            runtime.sensors[unique_id] = HalthySensorState(
                 unique_id=unique_id,
                 metric_key=LAST_UPDATE_METRIC_KEY,
                 name=LAST_UPDATE_NAME,
@@ -413,7 +469,7 @@ def _upsert_last_update_sensor(
         return
 
     unique_id = _unique_sensor_id(runtime.configured_username, "diagnostic", LAST_UPDATE_METRIC_KEY)
-    runtime.sensors[unique_id] = BridgeSensorState(
+    runtime.sensors[unique_id] = HalthySensorState(
         unique_id=unique_id,
         metric_key=LAST_UPDATE_METRIC_KEY,
         name=LAST_UPDATE_NAME,
@@ -430,6 +486,119 @@ def _upsert_last_update_sensor(
         metric_lookup.setdefault(compact_metric, []).append(unique_id)
     async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
     async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+
+
+def _upsert_daily_upload_count_sensor(
+    hass: HomeAssistant,
+    runtime: IntegrationRuntime,
+    entry_id: str,
+    metric_lookup: dict[str, list[str]],
+    source_device_id: str,
+    updated_at: datetime,
+) -> None:
+    timestamp_value = updated_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    current_day = _current_local_day_key(hass)
+    count_value = max(int(runtime.daily_upload_count), 0)
+    attributes = {
+        "measurement_timestamp": timestamp_value,
+        "source_device_id": source_device_id,
+        "day": current_day,
+        "diagnostic": True,
+    }
+
+    matching_unique_ids = _matching_metric_unique_ids(
+        runtime,
+        DAILY_UPLOAD_COUNT_METRIC_KEY,
+        metric_lookup,
+    )
+    if matching_unique_ids:
+        for unique_id in matching_unique_ids:
+            existing_state = runtime.sensors.get(unique_id)
+            state_device_id = existing_state.device_id if existing_state is not None else "diagnostic"
+            runtime.sensors[unique_id] = HalthySensorState(
+                unique_id=unique_id,
+                metric_key=DAILY_UPLOAD_COUNT_METRIC_KEY,
+                name=DAILY_UPLOAD_COUNT_NAME,
+                state=count_value,
+                unit=None,
+                icon=DAILY_UPLOAD_COUNT_ICON,
+                attributes=attributes,
+                username=runtime.app_username,
+                device_id=state_device_id,
+            )
+            async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+        return
+
+    unique_id = _unique_sensor_id(
+        runtime.configured_username,
+        "diagnostic",
+        DAILY_UPLOAD_COUNT_METRIC_KEY,
+    )
+    runtime.sensors[unique_id] = HalthySensorState(
+        unique_id=unique_id,
+        metric_key=DAILY_UPLOAD_COUNT_METRIC_KEY,
+        name=DAILY_UPLOAD_COUNT_NAME,
+        state=count_value,
+        unit=None,
+        icon=DAILY_UPLOAD_COUNT_ICON,
+        attributes=attributes,
+        username=runtime.app_username,
+        device_id="diagnostic",
+    )
+    metric_lookup.setdefault(DAILY_UPLOAD_COUNT_METRIC_KEY, []).append(unique_id)
+    compact_metric = DAILY_UPLOAD_COUNT_METRIC_KEY.replace("_", "")
+    if compact_metric != DAILY_UPLOAD_COUNT_METRIC_KEY:
+        metric_lookup.setdefault(compact_metric, []).append(unique_id)
+    async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
+    async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+
+
+def _increment_daily_upload_counter(
+    hass: HomeAssistant,
+    runtime: IntegrationRuntime,
+    entry_id: str,
+    source_device_id: str,
+    updated_at: datetime,
+) -> None:
+    current_day = _current_local_day_key(hass)
+    if runtime.daily_upload_count_day != current_day:
+        runtime.daily_upload_count_day = current_day
+        runtime.daily_upload_count = 0
+    runtime.daily_upload_count += 1
+    metric_lookup = _build_metric_lookup(runtime)
+    _upsert_daily_upload_count_sensor(
+        hass=hass,
+        runtime=runtime,
+        entry_id=entry_id,
+        metric_lookup=metric_lookup,
+        source_device_id=source_device_id,
+        updated_at=updated_at,
+    )
+
+
+def _reset_daily_upload_counter_if_needed(
+    hass: HomeAssistant,
+    runtime: IntegrationRuntime,
+    entry_id: str,
+) -> bool:
+    current_day = _current_local_day_key(hass)
+    if runtime.daily_upload_count_day == current_day and runtime.daily_upload_count == 0:
+        return False
+    if runtime.daily_upload_count_day == current_day:
+        return False
+
+    runtime.daily_upload_count_day = current_day
+    runtime.daily_upload_count = 0
+    metric_lookup = _build_metric_lookup(runtime)
+    _upsert_daily_upload_count_sensor(
+        hass=hass,
+        runtime=runtime,
+        entry_id=entry_id,
+        metric_lookup=metric_lookup,
+        source_device_id="diagnostic",
+        updated_at=datetime.now(timezone.utc),
+    )
+    return True
 
 
 def _coerce_state(value: Any) -> str | float | int | bool:
@@ -820,7 +989,7 @@ async def _async_import_statistics_batches(
     return imported_samples, successful_statistic_ids
 
 
-def _sensor_to_storage(state: BridgeSensorState) -> dict[str, Any]:
+def _sensor_to_storage(state: HalthySensorState) -> dict[str, Any]:
     return {
         "unique_id": state.unique_id,
         "metric_key": state.metric_key,
@@ -835,7 +1004,7 @@ def _sensor_to_storage(state: BridgeSensorState) -> dict[str, Any]:
     }
 
 
-def _image_to_storage(state: BridgeImageState) -> dict[str, Any]:
+def _image_to_storage(state: HalthyImageState) -> dict[str, Any]:
     return {
         "unique_id": state.unique_id,
         "metric_key": state.metric_key,
@@ -849,7 +1018,7 @@ def _image_to_storage(state: BridgeImageState) -> dict[str, Any]:
     }
 
 
-def _sensor_from_storage(unique_id: str, raw: Any) -> BridgeSensorState | None:
+def _sensor_from_storage(unique_id: str, raw: Any) -> HalthySensorState | None:
     if not isinstance(raw, dict):
         return None
 
@@ -861,7 +1030,7 @@ def _sensor_from_storage(unique_id: str, raw: Any) -> BridgeSensorState | None:
     attrs = raw.get("attributes")
     attributes = attrs if isinstance(attrs, dict) else {}
 
-    return BridgeSensorState(
+    return HalthySensorState(
         unique_id=str(raw.get("unique_id", unique_id)),
         metric_key=metric_key,
         name=_friendly_metric_name(metric_key, raw.get("name")),
@@ -875,7 +1044,7 @@ def _sensor_from_storage(unique_id: str, raw: Any) -> BridgeSensorState | None:
     )
 
 
-def _image_from_storage(unique_id: str, raw: Any) -> BridgeImageState | None:
+def _image_from_storage(unique_id: str, raw: Any) -> HalthyImageState | None:
     if not isinstance(raw, dict):
         return None
 
@@ -902,7 +1071,7 @@ def _image_from_storage(unique_id: str, raw: Any) -> BridgeImageState | None:
     if not content_type.startswith("image/"):
         content_type = "image/jpeg"
 
-    return BridgeImageState(
+    return HalthyImageState(
         unique_id=str(raw.get("unique_id", unique_id)),
         metric_key=metric_key,
         name=_friendly_metric_name(metric_key, raw.get("name")),
@@ -929,6 +1098,8 @@ def _serialize_entries(entries: dict[str, IntegrationRuntime]) -> dict[str, Any]
             "pending_force_upload_command": _json_safe(runtime.pending_force_upload_command),
             "last_force_upload_ack_at": runtime.last_force_upload_ack_at,
             "last_force_upload_ack_status": runtime.last_force_upload_ack_status,
+            "daily_upload_count": runtime.daily_upload_count,
+            "daily_upload_count_day": runtime.daily_upload_count_day,
             "statistics_cursors": {
                 statistic_id: cursor
                 for statistic_id, cursor in runtime.statistics_cursors.items()
@@ -957,6 +1128,74 @@ def _schedule_store_save(hass: HomeAssistant) -> None:
     store.async_delay_save(lambda: _serialize_entries(entries), SAVE_DELAY_SECONDS)
 
 
+def _resolve_activity_log_mode(target_entries: list[tuple[str, IntegrationRuntime]]) -> str:
+    mode_priority = {
+        ACTIVITY_LOG_MODE_OFF: 0,
+        ACTIVITY_LOG_MODE_SESSION_SUMMARY: 1,
+        ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE: 2,
+    }
+    resolved = ACTIVITY_LOG_MODE_OFF
+    resolved_priority = mode_priority[resolved]
+    for _, runtime in target_entries:
+        candidate = _coerce_activity_log_mode(runtime.activity_log_mode)
+        candidate_priority = mode_priority.get(candidate, 0)
+        if candidate_priority > resolved_priority:
+            resolved = candidate
+            resolved_priority = candidate_priority
+    return resolved
+
+
+async def _async_emit_activity_log_entries(
+    hass: HomeAssistant,
+    *,
+    mode: str,
+    username: str,
+    prune_unselected_metrics: bool,
+    accepted_total: int,
+    deleted_total: int,
+    duplicates: int,
+    ignored_older: int,
+    entity_ids: list[str],
+    deleted_entity_ids: list[str],
+) -> None:
+    normalized_mode = _coerce_activity_log_mode(mode)
+    if normalized_mode == ACTIVITY_LOG_MODE_OFF:
+        return
+    if not hass.services.has_service("logbook", "log"):
+        return
+
+    source_name = username.strip() or "unknown"
+    log_name = f"Halthy ({source_name})"
+
+    async def _log(message: str, entity_id: str | None = None) -> None:
+        service_data: dict[str, Any] = {
+            "name": log_name,
+            "message": message,
+            "domain": DOMAIN,
+        }
+        if entity_id:
+            service_data["entity_id"] = entity_id
+        await hass.services.async_call("logbook", "log", service_data, blocking=False)
+
+    if normalized_mode == ACTIVITY_LOG_MODE_SESSION_SUMMARY:
+        if not prune_unselected_metrics:
+            return
+        if accepted_total == 0 and deleted_total == 0:
+            return
+        summary = f"Sync: {accepted_total} updated, {deleted_total} removed"
+        if duplicates > 0 or ignored_older > 0:
+            summary += f" (duplicates {duplicates}, ignored older {ignored_older})"
+        await _log(summary)
+        return
+
+    unique_entity_ids = list(dict.fromkeys(entity_ids))
+    unique_deleted_entity_ids = list(dict.fromkeys(deleted_entity_ids))
+    for entity_id in unique_entity_ids:
+        await _log("Entity updated from iOS upload", entity_id=entity_id)
+    for entity_id in unique_deleted_entity_ids:
+        await _log("Entity removed after metric deselection", entity_id=entity_id)
+
+
 def _target_entries_for_username(
     entries: dict[str, IntegrationRuntime],
     username: str,
@@ -972,16 +1211,21 @@ def _target_entries_for_username(
 def _enqueue_force_upload_command(
     runtime: IntegrationRuntime,
     requested_by_user_id: str | None,
+    command_type: str = FORCE_UPLOAD_COMMAND_TYPE,
 ) -> tuple[bool, str]:
     existing_command = _normalize_pending_force_upload_command(runtime.pending_force_upload_command)
     if existing_command is not None:
         runtime.pending_force_upload_command = existing_command
         return False, str(existing_command["id"])
 
+    normalized_command_type = command_type.strip().lower()
+    if normalized_command_type not in SUPPORTED_COMMAND_TYPES:
+        normalized_command_type = FORCE_UPLOAD_COMMAND_TYPE
+
     command_id = str(uuid4())
     command: dict[str, Any] = {
         "id": command_id,
-        "type": FORCE_UPLOAD_COMMAND_TYPE,
+        "type": normalized_command_type,
         "requested_at": _utc_now_iso(),
     }
     if requested_by_user_id:
@@ -990,12 +1234,72 @@ def _enqueue_force_upload_command(
     return True, command_id
 
 
+async def async_queue_remote_command(
+    hass: HomeAssistant,
+    runtime: IntegrationRuntime,
+    requested_by_user_id: str | None = None,
+    command_type: str = FORCE_UPLOAD_COMMAND_TYPE,
+) -> tuple[bool, str]:
+    """Queue a remote command for the app and persist runtime store if needed."""
+    async with runtime.lock:
+        queued, command_id = _enqueue_force_upload_command(
+            runtime,
+            requested_by_user_id=requested_by_user_id,
+            command_type=command_type,
+        )
+    if queued:
+        _schedule_store_save(hass)
+    return queued, command_id
+
+
 def _clear_force_upload_timer(hass: HomeAssistant, entry_id: str) -> None:
     domain_data = hass.data.get(DOMAIN, {})
     timers: dict[str, Any] = domain_data.setdefault("force_upload_timers", {})
     unsub = timers.pop(entry_id, None)
     if unsub is not None:
         unsub()
+
+
+def _clear_daily_upload_reset_timer(hass: HomeAssistant, entry_id: str) -> None:
+    domain_data = hass.data.get(DOMAIN, {})
+    timers: dict[str, Any] = domain_data.setdefault("daily_upload_reset_timers", {})
+    unsub = timers.pop(entry_id, None)
+    if unsub is not None:
+        unsub()
+
+
+async def _async_reset_daily_upload_counter_for_entry(
+    hass: HomeAssistant,
+    entry_id: str,
+) -> None:
+    domain_data = hass.data.get(DOMAIN, {})
+    entries: dict[str, IntegrationRuntime] = domain_data.get("entries", {})
+    runtime = entries.get(entry_id)
+    if runtime is None:
+        return
+
+    did_reset = False
+    async with runtime.lock:
+        did_reset = _reset_daily_upload_counter_if_needed(hass, runtime, entry_id)
+    if did_reset:
+        _schedule_store_save(hass)
+
+
+def _reschedule_daily_upload_reset(hass: HomeAssistant, entry_id: str) -> None:
+    _clear_daily_upload_reset_timer(hass, entry_id)
+
+    @callback
+    def _midnight_callback(now: datetime) -> None:
+        hass.async_create_task(_async_reset_daily_upload_counter_for_entry(hass, entry_id))
+
+    domain_data = hass.data.get(DOMAIN, {})
+    domain_data.setdefault("daily_upload_reset_timers", {})[entry_id] = async_track_time_change(
+        hass,
+        _midnight_callback,
+        hour=0,
+        minute=0,
+        second=0,
+    )
 
 
 async def _async_enqueue_force_upload_from_interval(
@@ -1063,7 +1367,7 @@ async def _async_reload_entry_on_update(hass: HomeAssistant, entry: ConfigEntry)
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-class HalthyBridgePushView(HomeAssistantView):
+class HalthyPushView(HomeAssistantView):
     """Accept push payloads from the iOS app and fan out sensor updates."""
 
     url = ENDPOINT_PATH
@@ -1329,6 +1633,10 @@ class HalthyBridgePushView(HomeAssistantView):
                 if runtime.owner_user_id is None:
                     runtime.owner_user_id = request_user_id
 
+                accepted_sensor_count_before = len(accepted_sensor_ids)
+                accepted_image_count_before = len(accepted_image_ids)
+                deleted_count_before = deleted
+
                 metric_lookup = _build_metric_lookup(runtime)
                 image_metric_lookup = _build_image_metric_lookup(runtime)
                 runtime_statistics_candidates: list[dict[str, Any]] = []
@@ -1387,7 +1695,7 @@ class HalthyBridgePushView(HomeAssistantView):
                                     duplicates += 1
                                     continue
 
-                            runtime.sensors[target_unique_id] = BridgeSensorState(
+                            runtime.sensors[target_unique_id] = HalthySensorState(
                                 unique_id=target_unique_id,
                                 metric_key=metric_key,
                                 name=name,
@@ -1411,7 +1719,7 @@ class HalthyBridgePushView(HomeAssistantView):
                             )
                     else:
                         unique_id = _unique_sensor_id(username, device_id, metric_key)
-                        runtime.sensors[unique_id] = BridgeSensorState(
+                        runtime.sensors[unique_id] = HalthySensorState(
                             unique_id=unique_id,
                             metric_key=metric_key,
                             name=name,
@@ -1466,7 +1774,7 @@ class HalthyBridgePushView(HomeAssistantView):
                             state_device_id = (
                                 existing_state.device_id if existing_state is not None else device_id
                             )
-                            runtime.images[target_unique_id] = BridgeImageState(
+                            runtime.images[target_unique_id] = HalthyImageState(
                                 unique_id=target_unique_id,
                                 metric_key=metric_key,
                                 name=name,
@@ -1486,7 +1794,7 @@ class HalthyBridgePushView(HomeAssistantView):
                             )
                     else:
                         unique_id = _unique_image_id(username, device_id, metric_key)
-                        runtime.images[unique_id] = BridgeImageState(
+                        runtime.images[unique_id] = HalthyImageState(
                             unique_id=unique_id,
                             metric_key=metric_key,
                             name=name,
@@ -1531,7 +1839,8 @@ class HalthyBridgePushView(HomeAssistantView):
                         removed_images_by_entry.append((entry_id, unique_id))
                     deleted += len(removed_image_ids)
 
-                if entry_has_state_update or deleted > 0:
+                deleted_count_delta = deleted - deleted_count_before
+                if entry_has_state_update or deleted_count_delta > 0:
                     upserted_last_update_at = (
                         entry_last_update_at
                         if entry_last_update_at is not None
@@ -1544,6 +1853,21 @@ class HalthyBridgePushView(HomeAssistantView):
                         metric_lookup=metric_lookup,
                         source_device_id=device_id,
                         updated_at=upserted_last_update_at,
+                    )
+
+                accepted_count_delta = (
+                    (len(accepted_sensor_ids) - accepted_sensor_count_before)
+                    + (len(accepted_image_ids) - accepted_image_count_before)
+                )
+                # Count session-level uploads only. Single-point incremental pushes can issue
+                # many HTTP requests per sync cycle and would inflate this diagnostic metric.
+                if prune_unselected_metrics and (accepted_count_delta > 0 or deleted_count_delta > 0):
+                    _increment_daily_upload_counter(
+                        hass=hass,
+                        runtime=runtime,
+                        entry_id=entry_id,
+                        source_device_id=device_id,
+                        updated_at=entry_last_update_at or datetime.now(timezone.utc),
                     )
                 runtime_statistics_batches, runtime_cursor_updates = (
                     _prepare_statistics_imports_for_runtime(runtime, runtime_statistics_candidates)
@@ -1640,6 +1964,20 @@ class HalthyBridgePushView(HomeAssistantView):
                 registry.async_remove(entity_id)
             async_dispatcher_send(hass, remove_image_signal(entry_id, unique_id))
 
+        activity_log_mode = _resolve_activity_log_mode(target_entries)
+        await _async_emit_activity_log_entries(
+            hass,
+            mode=activity_log_mode,
+            username=username,
+            prune_unselected_metrics=prune_unselected_metrics,
+            accepted_total=accepted_total,
+            deleted_total=deleted,
+            duplicates=duplicates,
+            ignored_older=ignored_older,
+            entity_ids=entity_ids,
+            deleted_entity_ids=deleted_entity_ids,
+        )
+
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug(
                 "Processed Halthy push: username=%s accepted=%d created=%d updated=%d deleted=%d stats_imported=%d",
@@ -1679,7 +2017,7 @@ def _request_user_id_from_request(request: web.Request) -> str | None:
     return request_user_id.strip()
 
 
-class HalthyBridgeCommandView(HomeAssistantView):
+class HalthyCommandView(HomeAssistantView):
     """Provide pending integration command for the iOS app."""
 
     url = COMMAND_ENDPOINT_PATH
@@ -1755,7 +2093,7 @@ class HalthyBridgeCommandView(HomeAssistantView):
         return web.json_response(response_payload)
 
 
-class HalthyBridgeCommandAckView(HomeAssistantView):
+class HalthyCommandAckView(HomeAssistantView):
     """Accept command acknowledgements from the iOS app."""
 
     url = COMMAND_ACK_ENDPOINT_PATH
@@ -1861,6 +2199,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         "store": store,
         "stored_entries": stored_entries,
         "force_upload_timers": {},
+        "daily_upload_reset_timers": {},
     }
 
     async def _async_handle_force_upload_service(call: ServiceCall) -> None:
@@ -1921,11 +2260,77 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             len(target_entries),
         )
 
+    async def _async_handle_force_influx_backfill_service(call: ServiceCall) -> None:
+        domain_data = hass.data.get(DOMAIN, {})
+        entries: dict[str, IntegrationRuntime] = domain_data.get("entries", {})
+        if not entries:
+            return
+
+        raw_username = str(call.data.get(CONF_APP_USERNAME, "")).strip()
+        if raw_username:
+            target_entries = _target_entries_for_username(entries, raw_username)
+        else:
+            target_entries = list(entries.items())
+
+        if not target_entries:
+            _LOGGER.warning(
+                "Halthy force_influx_backfill service ignored: no entry for username '%s'",
+                raw_username,
+            )
+            return
+
+        request_user_id = call.context.user_id if isinstance(call.context.user_id, str) else None
+        queued_count = 0
+        already_pending_count = 0
+        denied_count = 0
+        for _, runtime in target_entries:
+            async with runtime.lock:
+                if (
+                    request_user_id
+                    and runtime.owner_user_id
+                    and runtime.owner_user_id != request_user_id
+                ):
+                    denied_count += 1
+                    continue
+                if request_user_id and runtime.owner_user_id is None:
+                    runtime.owner_user_id = request_user_id
+
+                queued, _ = _enqueue_force_upload_command(
+                    runtime,
+                    requested_by_user_id=request_user_id,
+                    command_type=FORCE_INFLUX_BACKFILL_COMMAND_TYPE,
+                )
+                if queued:
+                    queued_count += 1
+                else:
+                    already_pending_count += 1
+
+        if queued_count > 0:
+            _schedule_store_save(hass)
+        if denied_count > 0:
+            _LOGGER.warning(
+                "Halthy force_influx_backfill service skipped %d entry(ies) due to owner mismatch",
+                denied_count,
+            )
+        _LOGGER.debug(
+            "Halthy force_influx_backfill service: queued=%d already_pending=%d target_entries=%d",
+            queued_count,
+            already_pending_count,
+            len(target_entries),
+        )
+
     if not hass.services.has_service(DOMAIN, SERVICE_FORCE_UPLOAD):
         hass.services.async_register(
             DOMAIN,
             SERVICE_FORCE_UPLOAD,
             _async_handle_force_upload_service,
+            schema=FORCE_UPLOAD_SERVICE_SCHEMA,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_FORCE_INFLUX_BACKFILL):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_FORCE_INFLUX_BACKFILL,
+            _async_handle_force_influx_backfill_service,
             schema=FORCE_UPLOAD_SERVICE_SCHEMA,
         )
     return True
@@ -1935,7 +2340,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from config entry."""
     domain_data = hass.data.setdefault(
         DOMAIN,
-        {"entries": {}, "view_registered": False, "force_upload_timers": {}},
+        {
+            "entries": {},
+            "view_registered": False,
+            "force_upload_timers": {},
+            "daily_upload_reset_timers": {},
+        },
     )
     entries: dict[str, IntegrationRuntime] = domain_data["entries"]
     stored_entries: dict[str, Any] = domain_data.get("stored_entries", {})
@@ -1959,6 +2369,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ).strip()
     if temperature_unit_preference not in VALID_TEMPERATURE_UNITS:
         temperature_unit_preference = DEFAULT_TEMPERATURE_UNIT
+    activity_log_mode = _coerce_activity_log_mode(
+        entry.options.get(CONF_ACTIVITY_LOG_MODE, DEFAULT_ACTIVITY_LOG_MODE)
+    )
 
     stored_username = stored_entry.get("configured_username")
     if isinstance(stored_username, str) and stored_username.strip():
@@ -1998,6 +2411,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     if last_force_upload_ack_status not in {"completed", "failed"}:
         last_force_upload_ack_status = None
+    daily_upload_count = _coerce_daily_upload_count(stored_entry.get("daily_upload_count"))
+    daily_upload_count_day = _normalize_day_key(stored_entry.get("daily_upload_count_day"))
+    current_local_day = _current_local_day_key(hass)
+    if daily_upload_count_day != current_local_day:
+        daily_upload_count = 0
+        daily_upload_count_day = current_local_day
 
     runtime = IntegrationRuntime(
         configured_username=configured_username,
@@ -2005,10 +2424,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         display_name=display_name,
         owner_user_id=owner_user_id,
         temperature_unit_preference=temperature_unit_preference,
+        activity_log_mode=activity_log_mode,
         force_upload_interval_seconds=force_upload_interval_seconds,
         pending_force_upload_command=pending_force_upload_command,
         last_force_upload_ack_at=last_force_upload_ack_at,
         last_force_upload_ack_status=last_force_upload_ack_status,
+        daily_upload_count=daily_upload_count,
+        daily_upload_count_day=daily_upload_count_day,
     )
 
     stored_sensors = stored_entry.get("sensors", {})
@@ -2056,12 +2478,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entries[entry.entry_id] = runtime
 
     if not domain_data["view_registered"]:
-        hass.http.register_view(HalthyBridgePushView())
-        hass.http.register_view(HalthyBridgeCommandView())
-        hass.http.register_view(HalthyBridgeCommandAckView())
+        hass.http.register_view(HalthyPushView())
+        hass.http.register_view(HalthyCommandView())
+        hass.http.register_view(HalthyCommandAckView())
         domain_data["view_registered"] = True
 
+    _upsert_daily_upload_count_sensor(
+        hass=hass,
+        runtime=runtime,
+        entry_id=entry.entry_id,
+        metric_lookup=_build_metric_lookup(runtime),
+        source_device_id="diagnostic",
+        updated_at=datetime.now(timezone.utc),
+    )
     _reschedule_force_upload_interval(hass, entry.entry_id)
+    _reschedule_daily_upload_reset(hass, entry.entry_id)
 
     registry = er.async_get(hass)
     legacy_tracker_entity_ids = [
@@ -2100,5 +2531,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entries: dict[str, IntegrationRuntime] = domain_data.get("entries", {})
         entries.pop(entry.entry_id, None)
         _clear_force_upload_timer(hass, entry.entry_id)
+        _clear_daily_upload_reset_timer(hass, entry.entry_id)
         _schedule_store_save(hass)
     return unload_ok

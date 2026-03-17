@@ -1,4 +1,4 @@
-"""Sensor platform for Halthy bridge."""
+"""Sensor platform for Halthy."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BridgeSensorState, IntegrationRuntime
+from . import HalthySensorState, IntegrationRuntime
 from .const import (
     DOMAIN,
     MANUFACTURER,
@@ -66,7 +66,7 @@ async def async_setup_entry(
     """Set up bridge sensors from config entry."""
     domain_data = hass.data[DOMAIN]
     runtime: IntegrationRuntime = domain_data["entries"][entry.entry_id]
-    entities: dict[str, HalthyBridgeSensor] = {}
+    entities: dict[str, HalthySensor] = {}
 
     @callback
     def async_add_sensor(unique_id: str) -> None:
@@ -74,7 +74,7 @@ async def async_setup_entry(
             return
         if unique_id not in runtime.sensors:
             return
-        entity = HalthyBridgeSensor(runtime=runtime, entry_id=entry.entry_id, unique_id=unique_id)
+        entity = HalthySensor(runtime=runtime, entry_id=entry.entry_id, unique_id=unique_id)
         entities[unique_id] = entity
         async_add_entities([entity])
 
@@ -85,7 +85,7 @@ async def async_setup_entry(
     entry.async_on_unload(remove_listener)
 
 
-class HalthyBridgeSensor(SensorEntity):
+class HalthySensor(SensorEntity):
     """Represents a dynamically-created sensor pushed from the iOS app."""
 
     _attr_has_entity_name = False
@@ -105,13 +105,15 @@ class HalthyBridgeSensor(SensorEntity):
         self._apply_state(self._sensor_state)
 
     @callback
-    def _apply_state(self, state: BridgeSensorState) -> None:
+    def _apply_state(self, state: HalthySensorState) -> None:
         self._sensor_state = state
         self._attr_name = state.name
         self._attr_native_value = state.state
         self._attr_native_unit_of_measurement = state.unit
         self._attr_entity_category = (
-            EntityCategory.DIAGNOSTIC if state.metric_key == "last_update" else None
+            EntityCategory.DIAGNOSTIC
+            if state.metric_key in {"last_update", "daily_upload_count"}
+            else None
         )
         self._attr_state_class = None
         is_numeric_state = isinstance(state.state, (int, float)) and not isinstance(state.state, bool)

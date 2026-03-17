@@ -1,4 +1,4 @@
-# <img width="30" height="30" alt="icon-glass" src="https://github.com/user-attachments/assets/6b268c3b-f5e0-42b5-bde7-4157a2a555a2" /> Halthy Integration
+# <img width="30" height="30" alt="icon-glass" src="https://github.com/user-attachments/assets/6b268c3b-f5e0-42b5-bde7-4157a2a555a2" /> Halthy
 Home Assistant custom integration for Halthy App.
 
 # Halthy
@@ -9,7 +9,7 @@ The iOS app reads data from HealthKit and pushes it directly to Home Assistant o
 
 ## Features
 
-- Direct upload from iPhone to Home Assistant (`/api/halthy_bridge/push`)
+- Direct upload from iPhone to Home Assistant (`/api/halthy/push`)
 - Per-person setup with stable entity IDs and unique identifiers
 - Optional background sync
 - Optional raw HealthKit export to InfluxDB for advanced graphs in Grafana
@@ -20,7 +20,7 @@ The iOS app reads data from HealthKit and pushes it directly to Home Assistant o
 ## How it works
 
 1. The Home Assistant integration exposes a secure endpoint in Home Assistant itself:
-   - `POST /api/halthy_bridge/push`
+   - `POST /api/halthy/push`
 2. The app collects selected HealthKit metrics and optional workout route images.
 3. The app sends them in a single POST with:
    - your configured app username
@@ -57,7 +57,7 @@ For richer historical analysis, enable optional InfluxDB export. That path sends
 3. Add repository `https://github.com/Mosher23/Halthy-Bridge` and choose **Integration**.
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & Services → Add Integration**.
-6. Select **Halthy Bridge**.
+6. Select **Halthy**.
 7. Enter:
    - **App Username** (must match what you configure in the iOS app)
    - Optional **Display Name**

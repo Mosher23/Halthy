@@ -1,4 +1,4 @@
-"""Config flow for Halthy bridge."""
+"""Config flow for Halthy."""
 
 from __future__ import annotations
 
@@ -12,15 +12,21 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
+    ACTIVITY_LOG_MODE_OFF,
+    ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
+    ACTIVITY_LOG_MODE_SESSION_SUMMARY,
     CONF_APP_USERNAME,
+    CONF_ACTIVITY_LOG_MODE,
     CONF_DISPLAY_NAME,
     CONF_OWNER_USER_ID,
     CONF_TEMPERATURE_UNIT,
+    DEFAULT_ACTIVITY_LOG_MODE,
     DEFAULT_TEMPERATURE_UNIT,
     DOMAIN,
     TEMPERATURE_UNIT_CELSIUS,
     TEMPERATURE_UNIT_FAHRENHEIT,
     TEMPERATURE_UNIT_SYSTEM,
+    VALID_ACTIVITY_LOG_MODES,
     VALID_TEMPERATURE_UNITS,
 )
 
@@ -29,7 +35,7 @@ def _normalize_username(value: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_")
 
 
-class HalthyBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class HalthyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Halthy."""
 
     VERSION = 1
@@ -38,7 +44,7 @@ class HalthyBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: config_entries.ConfigEntry):
         """Return the options flow handler."""
-        return HalthyBridgeOptionsFlow(config_entry)
+        return HalthyOptionsFlow(config_entry)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
@@ -82,7 +88,7 @@ class HalthyBridgeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=data_schema)
 
 
-class HalthyBridgeOptionsFlow(config_entries.OptionsFlow):
+class HalthyOptionsFlow(config_entries.OptionsFlow):
     """Handle Halthy options."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
@@ -95,9 +101,17 @@ class HalthyBridgeOptionsFlow(config_entries.OptionsFlow):
             ).strip()
             if selected_unit not in VALID_TEMPERATURE_UNITS:
                 selected_unit = DEFAULT_TEMPERATURE_UNIT
+            selected_activity_log_mode = str(
+                user_input.get(CONF_ACTIVITY_LOG_MODE, DEFAULT_ACTIVITY_LOG_MODE)
+            ).strip()
+            if selected_activity_log_mode not in VALID_ACTIVITY_LOG_MODES:
+                selected_activity_log_mode = DEFAULT_ACTIVITY_LOG_MODE
             return self.async_create_entry(
                 title="",
-                data={CONF_TEMPERATURE_UNIT: selected_unit},
+                data={
+                    CONF_TEMPERATURE_UNIT: selected_unit,
+                    CONF_ACTIVITY_LOG_MODE: selected_activity_log_mode,
+                },
             )
 
         current_unit = str(
@@ -105,6 +119,11 @@ class HalthyBridgeOptionsFlow(config_entries.OptionsFlow):
         ).strip()
         if current_unit not in VALID_TEMPERATURE_UNITS:
             current_unit = DEFAULT_TEMPERATURE_UNIT
+        current_activity_log_mode = str(
+            self._config_entry.options.get(CONF_ACTIVITY_LOG_MODE, DEFAULT_ACTIVITY_LOG_MODE)
+        ).strip()
+        if current_activity_log_mode not in VALID_ACTIVITY_LOG_MODES:
+            current_activity_log_mode = DEFAULT_ACTIVITY_LOG_MODE
 
         data_schema = vol.Schema(
             {
@@ -122,6 +141,28 @@ class HalthyBridgeOptionsFlow(config_entries.OptionsFlow):
                             {
                                 "value": TEMPERATURE_UNIT_FAHRENHEIT,
                                 "label": "Always use Fahrenheit (°F)",
+                            },
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_ACTIVITY_LOG_MODE,
+                    default=current_activity_log_mode,
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {
+                                "value": ACTIVITY_LOG_MODE_OFF,
+                                "label": "Off",
+                            },
+                            {
+                                "value": ACTIVITY_LOG_MODE_SESSION_SUMMARY,
+                                "label": "Session summary",
+                            },
+                            {
+                                "value": ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
+                                "label": "Per-entity verbose",
                             },
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,

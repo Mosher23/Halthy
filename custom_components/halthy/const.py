@@ -1,15 +1,16 @@
-"""Constants for Halthy bridge integration."""
+"""Constants for Halthy integration."""
 
 from __future__ import annotations
 
 from homeassistant.const import Platform
 
-DOMAIN = "halthy_bridge"
+DOMAIN = "halthy"
 MANUFACTURER = "Halthy"
 CONF_APP_USERNAME = "app_username"
 CONF_DISPLAY_NAME = "name"
 CONF_OWNER_USER_ID = "owner_user_id"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
+CONF_ACTIVITY_LOG_MODE = "activity_log_mode"
 
 TEMPERATURE_UNIT_SYSTEM = "home_assistant"
 TEMPERATURE_UNIT_CELSIUS = "celsius"
@@ -21,17 +22,29 @@ VALID_TEMPERATURE_UNITS = (
     TEMPERATURE_UNIT_FAHRENHEIT,
 )
 
-ENDPOINT_PATH = "/api/halthy_bridge/push"
-ENDPOINT_NAME = "api:halthy_bridge:push"
-COMMAND_ENDPOINT_PATH = "/api/halthy_bridge/command"
-COMMAND_ENDPOINT_NAME = "api:halthy_bridge:command"
-COMMAND_ACK_ENDPOINT_PATH = "/api/halthy_bridge/command_ack"
-COMMAND_ACK_ENDPOINT_NAME = "api:halthy_bridge:command_ack"
+ACTIVITY_LOG_MODE_OFF = "off"
+ACTIVITY_LOG_MODE_SESSION_SUMMARY = "session_summary"
+ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE = "per_entity_verbose"
+DEFAULT_ACTIVITY_LOG_MODE = ACTIVITY_LOG_MODE_OFF
+VALID_ACTIVITY_LOG_MODES = (
+    ACTIVITY_LOG_MODE_OFF,
+    ACTIVITY_LOG_MODE_SESSION_SUMMARY,
+    ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
+)
+
+ENDPOINT_PATH = "/api/halthy/push"
+ENDPOINT_NAME = "api:halthy:push"
+COMMAND_ENDPOINT_PATH = "/api/halthy/command"
+COMMAND_ENDPOINT_NAME = "api:halthy:command"
+COMMAND_ACK_ENDPOINT_PATH = "/api/halthy/command_ack"
+COMMAND_ACK_ENDPOINT_NAME = "api:halthy:command_ack"
 SERVICE_FORCE_UPLOAD = "force_upload"
+SERVICE_FORCE_INFLUX_BACKFILL = "force_influx_backfill"
 
 _IMAGE_PLATFORM = getattr(Platform, "IMAGE", "image")
 _SELECT_PLATFORM = getattr(Platform, "SELECT", "select")
-PLATFORMS: list[Platform | str] = [Platform.SENSOR, _IMAGE_PLATFORM, _SELECT_PLATFORM]
+_BUTTON_PLATFORM = getattr(Platform, "BUTTON", "button")
+PLATFORMS: list[Platform | str] = [Platform.SENSOR, _IMAGE_PLATFORM, _SELECT_PLATFORM, _BUTTON_PLATFORM]
 
 
 def new_sensor_signal(entry_id: str) -> str:

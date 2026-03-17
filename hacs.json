@@ -1,8 +1,8 @@
 {
-  "name": "Halthy Bridge",
+  "name": "Halthy",
   "content_in_root": false,
   "render_readme": true,
   "zip_release": true,
-  "filename": "halthy_bridge.zip",
+  "filename": "halthy.zip",
   "hide_default_branch": false
 }

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Halthy",
-        "description": "Configure one app username for this bridge entry.",
+        "description": "Configure one app username for this Halthy entry.",
         "data": {
           "app_username": "App username",
           "name": "Display name (optional)"
@@ -21,9 +21,10 @@
     "step": {
       "init": {
         "title": "Halthy Options",
-        "description": "Choose how temperature values are exposed to Home Assistant.",
+        "description": "Choose how temperature values are exposed and whether Halthy writes to the Home Assistant activity log.",
         "data": {
-          "temperature_unit": "Temperature unit"
+          "temperature_unit": "Temperature unit",
+          "activity_log_mode": "Activity log mode"
         }
       }
     }
