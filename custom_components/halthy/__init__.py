@@ -133,6 +133,7 @@ FORCE_UPLOAD_SERVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_APP_USERNAME): cv.string,
     }
 )
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 if StatisticMetaData is not None:
     try:
