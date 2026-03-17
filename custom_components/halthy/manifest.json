@@ -1,13 +1,12 @@
 {
   "domain": "halthy",
   "name": "Halthy",
-  "icon": "icon.png",
   "codeowners": [
     "@Mosher23"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/sergii-tsiapenko/halthy",
-  "issue_tracker": "https://github.com/sergii-tsiapenko/halthy/issues",
+  "documentation": "https://github.com/Mosher23/Halthy-Bridge",
+  "issue_tracker": "https://github.com/Mosher23/Halthy-Bridge/issues",
   "integration_type": "service",
   "iot_class": "local_push",
   "requirements": [],
