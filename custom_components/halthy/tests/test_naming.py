@@ -70,6 +70,9 @@ class NamingHelpersTests(unittest.TestCase):
     def test_selection_management_excludes_last_update(self) -> None:
         self.assertFalse(NAMING.is_selection_managed_metric("last_update"))
 
+    def test_selection_management_excludes_last_full_sync(self) -> None:
+        self.assertFalse(NAMING.is_selection_managed_metric("last_full_sync"))
+
     def test_selection_management_excludes_daily_upload_count(self) -> None:
         self.assertFalse(NAMING.is_selection_managed_metric("daily_upload_count"))
 

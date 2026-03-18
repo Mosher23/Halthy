@@ -39,7 +39,7 @@ async def async_setup_entry(
             HalthyCommandButton(
                 runtime=runtime,
                 command_type=FORCE_INFLUX_BACKFILL_COMMAND_TYPE,
-                title="Force Influx backfill",
+                title="Update InfluxDB",
                 object_suffix="force_influx_backfill",
                 icon="mdi:database-sync",
             ),

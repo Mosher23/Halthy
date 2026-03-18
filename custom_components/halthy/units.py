@@ -85,6 +85,7 @@ _DURATION_METRIC_KEYS = {
 }
 
 _TIMESTAMP_METRIC_KEYS = {
+    "last_full_sync",
     "last_update",
     "workout_start",
     "workout_end",

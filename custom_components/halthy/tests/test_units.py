@@ -115,6 +115,7 @@ class UnitHelpersTests(unittest.TestCase):
 
     def test_timestamp_metric_detection(self) -> None:
         self.assertTrue(UNITS.is_timestamp_metric("last_update"))
+        self.assertTrue(UNITS.is_timestamp_metric("last_full_sync"))
         self.assertTrue(UNITS.is_timestamp_metric("workout_route_start"))
         self.assertTrue(UNITS.is_timestamp_metric("workout_route_end"))
         self.assertFalse(UNITS.is_timestamp_metric("workout_duration"))

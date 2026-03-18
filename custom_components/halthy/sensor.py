@@ -112,7 +112,7 @@ class HalthySensor(SensorEntity):
         self._attr_native_unit_of_measurement = state.unit
         self._attr_entity_category = (
             EntityCategory.DIAGNOSTIC
-            if state.metric_key in {"last_update", "daily_upload_count"}
+            if state.metric_key in {"last_update", "last_full_sync", "daily_upload_count"}
             else None
         )
         self._attr_state_class = None

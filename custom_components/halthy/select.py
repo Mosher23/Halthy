@@ -43,7 +43,7 @@ class HalthyForceUploadIntervalSelect(SelectEntity):
         self._attr_unique_id = (
             f"{DOMAIN}_{sanitize_identifier(runtime.configured_username)}_force_upload_interval"
         )
-        self._attr_name = "Force upload interval"
+        self._attr_name = "Upload interval"
         self._attr_icon = "mdi:timer-cog-outline"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_options = [label for label, _ in FORCE_UPLOAD_INTERVAL_OPTIONS]

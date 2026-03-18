@@ -105,6 +105,9 @@ MAX_IMAGE_BYTES = 350 * 1024
 LAST_UPDATE_METRIC_KEY = "last_update"
 LAST_UPDATE_NAME = "Last update"
 LAST_UPDATE_ICON = "mdi:clock-check-outline"
+LAST_FULL_SYNC_METRIC_KEY = "last_full_sync"
+LAST_FULL_SYNC_NAME = "Last full sync"
+LAST_FULL_SYNC_ICON = "mdi:sync"
 DAILY_UPLOAD_COUNT_METRIC_KEY = "daily_upload_count"
 DAILY_UPLOAD_COUNT_NAME = "Daily uploads"
 DAILY_UPLOAD_COUNT_ICON = "mdi:counter"
@@ -484,6 +487,61 @@ def _upsert_last_update_sensor(
     metric_lookup.setdefault(LAST_UPDATE_METRIC_KEY, []).append(unique_id)
     compact_metric = LAST_UPDATE_METRIC_KEY.replace("_", "")
     if compact_metric != LAST_UPDATE_METRIC_KEY:
+        metric_lookup.setdefault(compact_metric, []).append(unique_id)
+    async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
+    async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+
+
+def _upsert_last_full_sync_sensor(
+    hass: HomeAssistant,
+    runtime: IntegrationRuntime,
+    entry_id: str,
+    metric_lookup: dict[str, list[str]],
+    source_device_id: str,
+    updated_at: datetime,
+) -> None:
+    """Create or refresh the diagnostic last-full-sync sensor for the entry."""
+    timestamp_value = updated_at.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    attributes = {
+        "measurement_timestamp": timestamp_value,
+        "source_device_id": source_device_id,
+        "diagnostic": True,
+    }
+
+    matching_unique_ids = _matching_metric_unique_ids(runtime, LAST_FULL_SYNC_METRIC_KEY, metric_lookup)
+    if matching_unique_ids:
+        for unique_id in matching_unique_ids:
+            existing_state = runtime.sensors.get(unique_id)
+            state_device_id = existing_state.device_id if existing_state is not None else "diagnostic"
+            runtime.sensors[unique_id] = HalthySensorState(
+                unique_id=unique_id,
+                metric_key=LAST_FULL_SYNC_METRIC_KEY,
+                name=LAST_FULL_SYNC_NAME,
+                state=timestamp_value,
+                unit=None,
+                icon=LAST_FULL_SYNC_ICON,
+                attributes=attributes,
+                username=runtime.app_username,
+                device_id=state_device_id,
+            )
+            async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+        return
+
+    unique_id = _unique_sensor_id(runtime.configured_username, "diagnostic", LAST_FULL_SYNC_METRIC_KEY)
+    runtime.sensors[unique_id] = HalthySensorState(
+        unique_id=unique_id,
+        metric_key=LAST_FULL_SYNC_METRIC_KEY,
+        name=LAST_FULL_SYNC_NAME,
+        state=timestamp_value,
+        unit=None,
+        icon=LAST_FULL_SYNC_ICON,
+        attributes=attributes,
+        username=runtime.app_username,
+        device_id="diagnostic",
+    )
+    metric_lookup.setdefault(LAST_FULL_SYNC_METRIC_KEY, []).append(unique_id)
+    compact_metric = LAST_FULL_SYNC_METRIC_KEY.replace("_", "")
+    if compact_metric != LAST_FULL_SYNC_METRIC_KEY:
         metric_lookup.setdefault(compact_metric, []).append(unique_id)
     async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
     async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
@@ -1630,6 +1688,10 @@ class HalthyPushView(HomeAssistantView):
         ] = []
         hass_temperature_unit = str(hass.config.units.temperature_unit)
         for entry_id, runtime in target_entries:
+            pending_sensor_new: list[str] = []
+            pending_sensor_updates: list[str] = []
+            pending_image_new: list[str] = []
+            pending_image_updates: list[str] = []
             async with runtime.lock:
                 if runtime.owner_user_id is None:
                     runtime.owner_user_id = request_user_id
@@ -1715,9 +1777,7 @@ class HalthyPushView(HomeAssistantView):
                             elif incoming_measurement is not None and incoming_measurement > entry_last_update_at:
                                 entry_last_update_at = incoming_measurement
                             entry_has_state_update = True
-                            async_dispatcher_send(
-                                hass, update_sensor_signal(entry_id, target_unique_id)
-                            )
+                            pending_sensor_updates.append(target_unique_id)
                     else:
                         unique_id = _unique_sensor_id(username, device_id, metric_key)
                         runtime.sensors[unique_id] = HalthySensorState(
@@ -1743,8 +1803,8 @@ class HalthyPushView(HomeAssistantView):
                         compact_metric = metric_key.replace("_", "")
                         if compact_metric != metric_key:
                             metric_lookup.setdefault(compact_metric, []).append(unique_id)
-                        async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
-                        async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+                        pending_sensor_new.append(unique_id)
+                        pending_sensor_updates.append(unique_id)
 
                     if sensor_applied:
                         runtime_statistics_candidates.extend(
@@ -1790,9 +1850,7 @@ class HalthyPushView(HomeAssistantView):
                             if entry_last_update_at is None:
                                 entry_last_update_at = datetime.now(timezone.utc)
                             entry_has_state_update = True
-                            async_dispatcher_send(
-                                hass, update_image_signal(entry_id, target_unique_id)
-                            )
+                            pending_image_updates.append(target_unique_id)
                     else:
                         unique_id = _unique_image_id(username, device_id, metric_key)
                         runtime.images[unique_id] = HalthyImageState(
@@ -1814,8 +1872,8 @@ class HalthyPushView(HomeAssistantView):
                         compact_metric = metric_key.replace("_", "")
                         if compact_metric != metric_key:
                             image_metric_lookup.setdefault(compact_metric, []).append(unique_id)
-                        async_dispatcher_send(hass, new_image_signal(entry_id), unique_id)
-                        async_dispatcher_send(hass, update_image_signal(entry_id, unique_id))
+                        pending_image_new.append(unique_id)
+                        pending_image_updates.append(unique_id)
 
                 if prune_unselected_metrics and selected_metric_keys is not None:
                     removed_sensor_ids = [
@@ -1860,6 +1918,15 @@ class HalthyPushView(HomeAssistantView):
                     (len(accepted_sensor_ids) - accepted_sensor_count_before)
                     + (len(accepted_image_ids) - accepted_image_count_before)
                 )
+                if prune_unselected_metrics and (accepted_count_delta > 0 or deleted_count_delta > 0):
+                    _upsert_last_full_sync_sensor(
+                        hass=hass,
+                        runtime=runtime,
+                        entry_id=entry_id,
+                        metric_lookup=metric_lookup,
+                        source_device_id=device_id,
+                        updated_at=entry_last_update_at or datetime.now(timezone.utc),
+                    )
                 # Count session-level uploads only. Single-point incremental pushes can issue
                 # many HTTP requests per sync cycle and would inflate this diagnostic metric.
                 if prune_unselected_metrics and (accepted_count_delta > 0 or deleted_count_delta > 0):
@@ -1877,6 +1944,14 @@ class HalthyPushView(HomeAssistantView):
                     statistics_jobs.append(
                         (runtime, runtime_statistics_batches, runtime_cursor_updates)
                     )
+            for unique_id in pending_sensor_new:
+                async_dispatcher_send(hass, new_sensor_signal(entry_id), unique_id)
+            for unique_id in pending_sensor_updates:
+                async_dispatcher_send(hass, update_sensor_signal(entry_id, unique_id))
+            for unique_id in pending_image_new:
+                async_dispatcher_send(hass, new_image_signal(entry_id), unique_id)
+            for unique_id in pending_image_updates:
+                async_dispatcher_send(hass, update_image_signal(entry_id, unique_id))
 
         imported_statistics_samples = 0
         for runtime, runtime_statistics_batches, runtime_cursor_updates in statistics_jobs:
