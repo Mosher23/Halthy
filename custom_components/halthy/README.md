@@ -1,138 +1,209 @@
-# Halthy
+# <img width="30" height="30" alt="Halthy icon" src="brand/icon.png" /> Halthy
+Home Assistant custom integration for the Halthy app.
 
-Halthy is a local, peer-to-peer bridge that sends selected HealthKit metrics from your iPhone to Home Assistant.
+Halthy is a peer-to-peer bridge between iPhone HealthKit data and Home Assistant.
+The app talks directly to your Home Assistant instance. There is no external Halthy cloud relay for metric processing.
 
-The iOS app reads data from HealthKit and pushes it directly to Home Assistant on your network or public endpoint. There is no external HealthKit processing server in between.
+## ✨ Features
 
-## Features
+- Direct push from iPhone to Home Assistant via `POST /api/halthy/push`
+- Per-person setup with stable unique IDs and predictable entity IDs
+- Human-readable metric names with metric-specific icons and standardized units
+- Workout route map support (`image.*` entities)
+- Optional Home Assistant activity logbook integration (configurable)
+- Optional import from Home Assistant sensors back into HealthKit (in app)
+- Optional raw export to InfluxDB for long-range history and Grafana dashboards
+- Home Assistant UI setup with multi-user ownership handling
 
-- Direct upload from iPhone to Home Assistant (`/api/halthy/push`)
-- Per-person setup with stable entity IDs and unique identifiers
-- Optional background sync
-- Optional raw HealthKit export to InfluxDB for advanced graphs in Grafana
-- Human-readable sensor names and metric-specific icons
-- Supports route map images for workouts
-- Easy setup from Home Assistant UI
+## 🔄 How It Works
 
-## How it works
+### 📤 Export Path (HealthKit -> Home Assistant)
 
-1. The Home Assistant integration exposes a secure endpoint in Home Assistant itself:
-   - `POST /api/halthy/push`
-2. The app collects selected HealthKit metrics and optional workout route images.
-3. The app sends them in a single POST with:
-   - your configured app username
-   - unique device ID
+1. The app reads selected HealthKit metrics and optional workout route images.
+2. The app sends one authenticated payload to `/api/halthy/push` with:
+   - app username
+   - device ID
    - selected metric keys
-   - `sensors[]` entries with state, unit, and optional attributes
-   - optional `images[]` entries for route maps
-4. The integration creates/updates:
-   - sensor entities (example `sensor.<app_username>_steps`)
-   - image entities (example `image.<app_username>_workout_route_map`)
-   - a timestamp diagnostic sensor `sensor.<app_username>_last_update`
+   - `sensors[]` values and attributes
+   - optional `images[]` route maps
+3. The integration creates or updates:
+   - `sensor.<app_username>_<metric_key>`
+   - `image.<app_username>_workout_route_map`
+   - diagnostic sensors for sync status
 
-Entity IDs use your integration username prefix, so `sensor.sergi_steps` and `sensor.anna_steps` stay separate for different people.
+### 📥 Command Path (Home Assistant -> App)
 
-The integration runs inside Home Assistant, so data is written directly into your HA instance.
+The integration exposes command endpoints used by the iOS app:
 
-### Home Assistant state limitation
+- `GET /api/halthy/command`
+- `POST /api/halthy/command_ack`
 
-Home Assistant entity states are designed as "current state" storage. The push endpoint updates the current value of each entity, so historical timing from every sample is not preserved as state in HA automatically.
+This is used for remote actions like force upload and Influx backfill.
 
-What this means:
+## 📉 Home Assistant State Limitation and 📊 Statistics Import
 
-- dashboards and automations work well with latest values
-- precise time-series reconstruction and strict timestamp-based analytics are limited at the HA state level
+> [!IMPORTANT]
+> Home Assistant entity states represent **current values**. State pushes do not preserve full sample-by-sample history by themselves.
 
-For richer historical analysis, enable optional InfluxDB export. That path sends raw health samples with timestamps to InfluxDB and is better suited for Grafana charts and long-range analytics.
+To improve history inside Home Assistant:
 
-## Install and set up Home Assistant integration
+- When a pushed numeric metric includes `measurement_timestamp`, Halthy imports it into recorder statistics.
+- Imports are deduplicated by per-metric cursors.
+- Statistics are bucketed hourly for reliable long-term charting.
 
-### Install from HACS (preferred)
+For full raw sample history and advanced analytics, use optional InfluxDB export.
 
-1. Open **HACS** in Home Assistant.
-2. Go to **Integrations** → **...** → **+ Explore & download repositories**.
-3. Add repository `https://github.com/sergii-tsiapenko/halthy` and choose **Integration**.
+## 🧩 Install and Setup
+
+### 🛒 Install from HACS (Preferred)
+
+1. Open **HACS**.
+2. Go to **Integrations** and add this repository as a custom integration repository if needed:
+   - `https://github.com/Mosher23/Halthy-Bridge`
+3. Install **Halthy**.
 4. Restart Home Assistant.
-5. Go to **Settings → Devices & Services → Add Integration**.
+5. Go to **Settings -> Devices & Services -> Add Integration**.
 6. Select **Halthy**.
 7. Enter:
-   - **App Username** (must match what you configure in the iOS app)
-   - Optional **Display Name**
-8. Repeat steps 6–7 once for each person.
-9. If this repository is not available in the HACS browser yet, add it first as a custom repository.
+   - **App Username** (must match iOS app username)
+   - **Display Name** (optional)
+8. Repeat per person.
 
-### Manual install (alternative)
+### 🧰 Manual Install
 
-1. Copy `custom_components/halthy` into `<config>/custom_components/`.
+1. Copy `custom_components/halthy` to `<config>/custom_components/`.
 2. Restart Home Assistant.
-3. Add the integration as above.
+3. Add integration from UI.
 
-## What to put in the iOS app
+## ⚙️ Home Assistant Integration Options
 
-Open the app and go to **Settings**.
+Open **Settings -> Devices & Services -> Halthy -> Configure**.
 
-### Required fields
+### 🌡️ Temperature Unit
 
-- **Home Assistant URL**
-  - This must be HTTPS and reachable from your phone.
-  - Example: `https://homeassistant.local:8123` or a remote URL behind Nabu Casa / reverse proxy.
-- **Access Token**
-  - A Home Assistant long-lived token for your user.
-- **Username**
-  - Human readable identifier used to route data to the corresponding integration entry and to name entities.
+Choose how incoming temperature metrics are exposed:
 
-Recommended pattern for username:
+- Home Assistant unit system
+- Always Celsius
+- Always Fahrenheit
 
-- Use the same value as **App Username** in integration setup.
-- Keep it short and stable (for example `sergi`, `partner1`).
+### 📝 Activity Log Mode
 
-### Recommended settings
+Controls what Halthy writes to Home Assistant Logbook:
 
-- Enable **Background Upload** if you want automatic periodic uploads.
-- Choose **Health Data Types** you want to send.
-- Grant route access for route map uploads under health permissions.
-- Use **Test connection** after entering settings.
+| Mode | Behavior |
+|---|---|
+| `Off` | No Logbook entries |
+| `Session summary` | One summary entry per sync session (updated/removed counts) |
+| `Per-entity verbose` | Per-entity update/remove entries |
 
-### In-app options and behavior
+## 📱 iOS App Setup
 
-- Set upload interval for scheduled background syncs.
-- `sensor` names are formatted for readability in the UI
-  - `walking_speed` becomes `Walking Speed`
-- You can run a manual upload test from the app and see upload status in logs.
+Open **Halthy -> Settings**.
 
-## How to get a Home Assistant token
+### ✅ Required
 
-1. Open Home Assistant in browser.
-2. Open your profile (avatar in the left sidebar).
-3. Go to **Security**.
-4. Under **Long-lived access tokens**, click **Create token**.
-5. Give it a clear name such as `Halthy`.
-6. Copy the token immediately and paste it into **Access Token** in the app.
+- **Home Assistant URL** (HTTPS)
+- **Access Token** (Home Assistant long-lived token)
+- **Username** (must match integration App Username)
 
-Optional workflow:
-- Use the QR scanner button in the app to paste a token from a QR payload.
+### 👍 Recommended
 
-## Optional: InfluxDB export + Grafana
+- Enable background upload
+- Select health data types
+- Grant workout and route permissions if needed
+- Use Test connection
 
-Halthy can also export raw HealthKit points to InfluxDB while still using Home Assistant for entity state.
+### 🧠 Optional App Features
 
-In **Settings → InfluxDB**:
+- **Import metrics**: pull mapped Home Assistant sensor states into HealthKit
+- **InfluxDB**: export raw HealthKit samples to InfluxDB
+- **Shortcuts action**: trigger **Upload Now** from the iOS Shortcuts app
+- **Log** section: view upload/import status and troubleshooting hints
 
-- Enable export
-- InfluxDB URL
+## 🔗 iOS Shortcuts: Upload Now
+
+Halthy exposes an App Intent named **Upload Now**.
+
+You can use it from the iOS Shortcuts app:
+
+1. Open **Shortcuts**.
+2. Create or edit a shortcut.
+3. Tap **Add Action** and search for **Halthy**.
+4. Select **Upload Now**.
+5. Run it manually, pin it to Home Screen, or use it in automations.
+
+Behavior:
+
+- Runs the same force-upload flow as the app's **Upload Now** button.
+- Uses your existing app configuration and selected metrics.
+
+## 🔁 Import Metrics from Home Assistant (Optional)
+
+Halthy can import Home Assistant sensor values into HealthKit.
+
+In app settings:
+
+1. Enable **Import metrics**.
+2. Add mapping(s):
+   - Home Assistant sensor suffix (for `sensor.<suffix>`)
+   - Target HealthKit metric type
+   - Source and target units
+   - Friendly name
+3. Keep each mapping enabled.
+
+Current behavior and limits:
+
+- Import supports quantity metrics.
+- Dietary metrics are excluded.
+- Values are fetched from Home Assistant sensor state endpoints.
+- Import uses timestamps from `measurement_timestamp` when available, with fallback to HA update timestamps.
+- Imported HealthKit samples are written as user-entered values.
+
+## 🩺 Diagnostic Metrics
+
+Each configured person gets diagnostic entities:
+
+- `sensor.<app_username>_last_update`
+  - Timestamp of the latest accepted update for that user
+- `sensor.<app_username>_daily_upload_count`
+  - Number of full sync uploads accepted for current local day
+  - Automatically resets daily
+
+You also get config/control entities per user:
+
+- `select.<app_username>_force_upload_interval`
+- `button.<app_username>_force_upload`
+- `button.<app_username>_force_influx_backfill`
+
+## 📈 Optional: InfluxDB Export + Grafana
+
+In app **Settings -> InfluxDB**:
+
+- Enable Influx export
+- URL
 - Organization
 - Bucket
-- Measurement (default: `healthkit_raw`)
-- InfluxDB Token
+- Measurement (default `healthkit_raw`)
+- Token
 
-Why you might use this:
-- More granular data retention than HA recorder
-- Query-level analytics and transformations in InfluxDB
-- Better charts/boards in Grafana for long-term trends
+Use this when you want:
 
-## Troubleshooting
+- Raw timestamped sample retention
+- More precise historical analysis than state-only Home Assistant entities
+- Grafana dashboards over long periods
 
-- Home Assistant URL and token are empty: integration will not accept uploads.
-- `401`/`403` responses from Home Assistant: token is missing or expired.
-- Sensor updates appear but values are delayed: confirm upload interval and allow background execution for the app.
-- If entities look wrong, verify app username matches `App Username` used in the integration setup.
+## 🔑 How to Get a Home Assistant Token
+
+1. Open Home Assistant.
+2. Open your user profile.
+3. Go to **Security**.
+4. Under **Long-lived access tokens**, create a token.
+5. Copy it immediately into the app.
+
+## 🛠️ Troubleshooting
+
+- **`401` or `403`**: token missing, expired, or wrong user ownership for target username.
+- **Push works but history looks sparse**: this is usually state-vs-history limitation; enable recorder statistics and/or InfluxDB.
+- **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.
+- **Sensors not updating**: verify app username in app exactly matches integration App Username.
