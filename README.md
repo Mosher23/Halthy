@@ -207,3 +207,5 @@ Use this when you want:
 - **Push works but history looks sparse**: this is usually state-vs-history limitation; enable recorder statistics and/or InfluxDB.
 - **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.
 - **Sensors not updating**: verify app username in app exactly matches integration App Username.
+
+<a href="https://www.buymeacoffee.com/sergiit" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
