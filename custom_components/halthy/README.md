@@ -2,7 +2,7 @@
 <a href="https://www.buymeacoffee.com/sergiit" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>   [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/O5O81W9KPE)
 
 
-# <img width="30" height="30" alt="Halthy icon" src="custom_components/halthy/brand/icon.png" />  Halthy Home Assistant Integration
+# <img width="30" height="30" alt="Halthy icon" src="custom_components/halthy/brand/icon.png" /> Halthy Home Assistant Integration
 
 Halthy is a Home Assistant custom integration that receives health metrics from the Halthy app and creates per-user entities with stable unique identifiers.
 
