@@ -1,6 +1,7 @@
 # <img width="30" height="30" alt="Halthy icon" src="custom_components/halthy/brand/icon.png" /> Halthy
 Home Assistant custom integration for the Halthy app.
 
+
 Halthy is a peer-to-peer bridge between iPhone HealthKit data and Home Assistant.
 The app talks directly to your Home Assistant instance. There is no external Halthy cloud relay for metric processing.
 
@@ -209,3 +210,4 @@ Use this when you want:
 - **Sensors not updating**: verify app username in app exactly matches integration App Username.
 
 <a href="https://www.buymeacoffee.com/sergiit" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/O5O81W9KPE)
