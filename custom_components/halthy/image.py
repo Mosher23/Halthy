@@ -25,6 +25,206 @@ from .naming import sanitize_identifier
 
 _LOGGER = logging.getLogger(__name__)
 
+WORKOUT_IMAGE_METRIC_KEY = "workout"
+WORKOUT_STATE_TYPE_KEYS = (
+    "workout_type",
+    "workout_activity_type",
+    "activity_type",
+    "workout_kind",
+    "type",
+)
+WORKOUT_ATTRIBUTE_SOURCES: dict[str, tuple[str, ...]] = {
+    "Active energy (kcal)": (
+        "workout_active_energy_kcal",
+        "active_energy_kcal",
+        "active_energy",
+        "workout_active_energy",
+    ),
+    "Total flights climbed": (
+        "total_flights_climbed",
+        "workout_total_flights_climbed",
+        "flights_climbed",
+        "flights",
+    ),
+    "Highest altitude": (
+        "highest_altitude_m",
+        "max_altitude_m",
+        "highest_altitude",
+        "workout_highest_altitude_m",
+    ),
+    "Lowest altitude": (
+        "lowest_altitude_m",
+        "min_altitude_m",
+        "lowest_altitude",
+        "workout_lowest_altitude_m",
+    ),
+    "Lowest speed": (
+        "lowest_speed_mps",
+        "min_speed_mps",
+        "lowest_speed",
+        "workout_lowest_speed_mps",
+    ),
+    "Highest speed": (
+        "highest_speed_mps",
+        "max_speed_mps",
+        "highest_speed",
+        "workout_highest_speed_mps",
+    ),
+    "Avg speed": (
+        "avg_speed_mps",
+        "workout_avg_speed_mps",
+        "average_speed_mps",
+        "workout_average_speed_mps",
+    ),
+    "Lowest heart rate": (
+        "lowest_heart_rate_bpm",
+        "min_heart_rate_bpm",
+        "lowest_heart_rate",
+        "workout_lowest_heart_rate_bpm",
+    ),
+    "Highest heart rate": (
+        "highest_heart_rate_bpm",
+        "max_heart_rate_bpm",
+        "highest_heart_rate",
+        "workout_highest_heart_rate_bpm",
+    ),
+    "Avg heart rate": (
+        "avg_heart_rate_bpm",
+        "average_heart_rate_bpm",
+        "workout_avg_heart_rate_bpm",
+    ),
+    "Cadence": (
+        "cadence_spm",
+        "avg_cadence_spm",
+        "cadence",
+    ),
+    "Power": (
+        "power_w",
+        "avg_power_w",
+        "power",
+    ),
+    "Respiratory rate": (
+        "respiratory_rate_brpm",
+        "respiratory_rate",
+        "avg_respiratory_rate_brpm",
+    ),
+}
+
+
+def _is_workout_metric(metric_key: str) -> bool:
+    return sanitize_identifier(metric_key) == WORKOUT_IMAGE_METRIC_KEY
+
+
+def _first_present_attr(attrs: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        value = attrs.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if numeric == float("inf") or numeric == float("-inf"):
+            return None
+        if numeric != numeric:
+            return None
+        return numeric
+    if isinstance(value, str):
+        normalized = value.strip().replace(",", ".")
+        if not normalized:
+            return None
+        try:
+            numeric = float(normalized)
+        except ValueError:
+            return None
+        if numeric == float("inf") or numeric == float("-inf"):
+            return None
+        if numeric != numeric:
+            return None
+        return numeric
+    return None
+
+
+def _derive_from_route_points(attrs: dict[str, Any]) -> dict[str, float]:
+    route_points = attrs.get("route_points")
+    if not isinstance(route_points, list):
+        return {}
+
+    altitudes: list[float] = []
+    speeds: list[float] = []
+    for raw_point in route_points:
+        if not isinstance(raw_point, dict):
+            continue
+        altitude = _coerce_float(raw_point.get("altitude"))
+        if altitude is not None:
+            altitudes.append(altitude)
+        speed = _coerce_float(
+            raw_point.get("speed_mps")
+            or raw_point.get("speedMetersPerSecond")
+            or raw_point.get("speed")
+        )
+        if speed is not None:
+            speeds.append(speed)
+
+    derived: dict[str, float] = {}
+    if altitudes:
+        derived["Highest altitude"] = max(altitudes)
+        derived["Lowest altitude"] = min(altitudes)
+    if speeds:
+        derived["Highest speed"] = max(speeds)
+        derived["Lowest speed"] = min(speeds)
+    return derived
+
+
+def _workout_type_from_attributes(attrs: dict[str, Any]) -> str:
+    raw_type = _first_present_attr(attrs, WORKOUT_STATE_TYPE_KEYS)
+    if raw_type is None:
+        return "Workout"
+
+    if isinstance(raw_type, str):
+        cleaned = raw_type.strip()
+        if not cleaned:
+            return "Workout"
+        cleaned = cleaned.replace("HKWorkoutActivityType", "")
+        cleaned = cleaned.replace("_", " ").replace("-", " ").strip()
+        if not cleaned:
+            return "Workout"
+        return " ".join(part.capitalize() for part in cleaned.split())
+
+    return str(raw_type)
+
+
+def _format_workout_attribute_value(label: str, value: Any) -> Any:
+    if label == "Total flights climbed":
+        numeric = _coerce_float(value)
+        if numeric is not None:
+            return int(round(numeric))
+    numeric = _coerce_float(value)
+    if numeric is not None:
+        return round(numeric, 3)
+    return value
+
+
+def _workout_attributes(raw_attrs: dict[str, Any]) -> dict[str, Any]:
+    attrs = dict(raw_attrs)
+    derived = _derive_from_route_points(attrs)
+    normalized: dict[str, Any] = {}
+    for label, source_keys in WORKOUT_ATTRIBUTE_SOURCES.items():
+        raw_value = _first_present_attr(attrs, source_keys)
+        if raw_value is None:
+            raw_value = derived.get(label)
+        if raw_value is None:
+            continue
+        normalized[label] = _format_workout_attribute_value(label, raw_value)
+    return normalized
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -91,6 +291,7 @@ class HalthyImage(ImageEntity):
         self._entry_id = entry_id
         self._image_unique_id = unique_id
         self._image_state = runtime.images[unique_id]
+        self._workout_state = "Workout"
 
         self._attr_unique_id = unique_id
         self._attr_suggested_object_id = (
@@ -104,11 +305,19 @@ class HalthyImage(ImageEntity):
         self._image_state = state
         self._attr_name = state.name
         self._attr_content_type = state.content_type
-        attrs: dict[str, Any] = dict(state.attributes)
-        attrs.setdefault("metric_key", state.metric_key)
-        attrs.setdefault("username", state.username)
-        attrs.setdefault("device_id", state.device_id)
-        attrs["last_pushed"] = state.updated_at.isoformat()
+        if _is_workout_metric(state.metric_key):
+            attrs = _workout_attributes(state.attributes)
+            attrs["username"] = state.username
+            attrs["device_id"] = state.device_id
+            attrs["last_pushed"] = state.updated_at.isoformat()
+            self._workout_state = _workout_type_from_attributes(state.attributes)
+        else:
+            attrs = dict(state.attributes)
+            attrs.setdefault("metric_key", state.metric_key)
+            attrs.setdefault("username", state.username)
+            attrs.setdefault("device_id", state.device_id)
+            attrs["last_pushed"] = state.updated_at.isoformat()
+            self._workout_state = "Workout"
         self._attr_extra_state_attributes = attrs
 
     @property
@@ -126,7 +335,8 @@ class HalthyImage(ImageEntity):
 
     @property
     def state(self) -> str:
-        # Keep a stable text state for dashboard readability.
+        if _is_workout_metric(self._image_state.metric_key):
+            return self._workout_state
         return "idle"
 
     async def async_added_to_hass(self) -> None:

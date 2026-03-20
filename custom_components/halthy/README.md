@@ -61,7 +61,7 @@ Open **Settings -> Devices & Services -> Halthy -> Configure**.
 ### Data entities
 
 - Sensors: `sensor.<app_username>_<metric_key>`
-- Workout route image: `image.<app_username>_workout_route_map`
+- Workout image: `image.<app_username>_workout`
 
 ### Diagnostic entities
 

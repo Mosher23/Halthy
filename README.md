@@ -33,7 +33,7 @@ The app talks directly to your Home Assistant instance. There is no external Hal
    - optional `images[]` route maps
 3. The integration creates or updates:
    - `sensor.<app_username>_<metric_key>`
-   - `image.<app_username>_workout_route_map`
+   - `image.<app_username>_workout`
    - diagnostic sensors for sync status
 
 ### 📥 Command Path (Home Assistant -> App)

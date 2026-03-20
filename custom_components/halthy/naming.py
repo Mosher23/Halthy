@@ -103,7 +103,8 @@ _FRIENDLY_KEY_OVERRIDES = {
     "bp_diastolic": "blood pressure diastolic",
     "workout_route_start": "workout start",
     "workout_route_end": "workout end",
-    "workout_route_map": "workout route",
+    "workout_route_map": "workout",
+    "workout": "workout",
 }
 
 _METRIC_PREFIX_PATTERNS = (
@@ -117,6 +118,7 @@ _METRIC_PREFIX_PATTERNS = (
 
 _METRIC_KEY_ALIASES = {
     "sleep_in_g_wrist_temperature": "sleeping_wrist_temperature",
+    "workout_route_map": "workout",
 }
 
 _NON_SELECTION_MANAGED_METRIC_KEYS: frozenset[str] = frozenset(
@@ -131,6 +133,7 @@ _NON_SELECTION_MANAGED_METRIC_KEYS: frozenset[str] = frozenset(
         "workout_route_start",
         "workout_route_end",
         "workout_route_map",
+        "workout",
     }
 )
 

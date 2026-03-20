@@ -67,6 +67,10 @@ class NamingHelpersTests(unittest.TestCase):
     def test_selection_management_includes_workout_route_map(self) -> None:
         self.assertFalse(NAMING.is_selection_managed_metric("workout_route_map"))
 
+    def test_workout_route_map_aliases_to_workout(self) -> None:
+        key = NAMING.normalize_metric_key("workout_route_map")
+        self.assertEqual(key, "workout")
+
     def test_selection_management_excludes_last_update(self) -> None:
         self.assertFalse(NAMING.is_selection_managed_metric("last_update"))
 
