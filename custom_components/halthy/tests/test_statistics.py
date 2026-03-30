@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import importlib.util
 import pathlib
 import sys
+import tempfile
 import types
 import unittest
 
@@ -191,6 +192,52 @@ BRIDGE = _load_integration_module()
 
 
 class StatisticsHelpersTests(unittest.TestCase):
+    def test_workout_archive_file_name_uses_timestamp_and_workout_uuid(self) -> None:
+        file_name, workout_fingerprint, workout_timestamp, extension = (
+            BRIDGE._workout_archive_file_name(
+                metric_key="workout_route_map",
+                attributes={
+                    "measurement_timestamp": "2026-03-28T18:15:12Z",
+                    "workout_uuid": "ABCD-1234",
+                },
+                content_type="image/jpeg",
+            )
+        )
+
+        self.assertEqual(workout_fingerprint, "uuid_abcd_1234")
+        self.assertEqual(extension, "jpg")
+        self.assertEqual(
+            workout_timestamp,
+            datetime(2026, 3, 28, 18, 15, 12, tzinfo=timezone.utc),
+        )
+        self.assertEqual(file_name, "20260328T181512Z_uuid_abcd_1234.jpg")
+
+    def test_store_workout_archive_file_replaces_files_for_same_workout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_dir = pathlib.Path(temp_dir)
+            old_same_workout_jpg = archive_dir / "20260328T181512Z_uuid_abcd_1234.jpg"
+            old_same_workout_png = archive_dir / "20260328T181513Z_uuid_abcd_1234.png"
+            other_workout_file = archive_dir / "20260328T181514Z_uuid_other_5678.jpg"
+            old_same_workout_jpg.write_bytes(b"old_jpg")
+            old_same_workout_png.write_bytes(b"old_png")
+            other_workout_file.write_bytes(b"other")
+
+            replaced_count = BRIDGE._store_workout_archive_file(
+                archive_dir=archive_dir,
+                file_name="20260328T181520Z_uuid_abcd_1234.jpg",
+                image_bytes=b"new_image",
+                workout_fingerprint="uuid_abcd_1234",
+            )
+
+            self.assertEqual(replaced_count, 2)
+            self.assertFalse(old_same_workout_jpg.exists())
+            self.assertFalse(old_same_workout_png.exists())
+            self.assertTrue(other_workout_file.exists())
+            self.assertEqual(
+                (archive_dir / "20260328T181520Z_uuid_abcd_1234.jpg").read_bytes(),
+                b"new_image",
+            )
+
     def test_prepare_statistics_uses_top_of_hour_buckets(self) -> None:
         runtime = BRIDGE.IntegrationRuntime(
             configured_username="tester",

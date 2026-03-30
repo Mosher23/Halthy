@@ -12,6 +12,7 @@ import inspect
 import json
 import logging
 import math
+from pathlib import Path
 import re
 from typing import Any
 from uuid import uuid4
@@ -102,6 +103,35 @@ MAX_REQUEST_BYTES = 512 * 1024
 MAX_ATTRIBUTES_BYTES = 64 * 1024
 MAX_ROUTE_POINTS = 120
 MAX_IMAGE_BYTES = 350 * 1024
+WORKOUT_IMAGE_METRIC_KEY = "workout"
+WORKOUT_ARCHIVE_TIMESTAMP_ATTRIBUTE_KEYS: tuple[str, ...] = (
+    "measurement_timestamp",
+    "workout_end",
+    "workout_start",
+)
+WORKOUT_ARCHIVE_ID_ATTRIBUTE_KEYS: tuple[str, ...] = (
+    "workout_uuid",
+    "workout_id",
+    "uuid",
+)
+WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS: tuple[str, ...] = (
+    "workout_type",
+    "workout_activity_type",
+    "type",
+)
+WORKOUT_IMAGE_CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/bmp": "bmp",
+    "image/tiff": "tiff",
+    "image/heic": "heic",
+    "image/heif": "heif",
+}
+WORKOUT_CARD_MODULE_FILENAME = "halthy-workout-card.js"
+WORKOUT_CARD_STATIC_URL = f"/{DOMAIN}/{WORKOUT_CARD_MODULE_FILENAME}"
 LAST_UPDATE_METRIC_KEY = "last_update"
 LAST_UPDATE_NAME = "Last update"
 LAST_UPDATE_ICON = "mdi:clock-check-outline"
@@ -756,6 +786,164 @@ def _parse_measurement_timestamp(raw_value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _first_nonempty_attribute_value(attributes: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        raw_value = attributes.get(key)
+        if raw_value is None:
+            continue
+        value = str(raw_value).strip()
+        if value:
+            return value
+    return None
+
+
+def _workout_archive_timestamp(attributes: dict[str, Any]) -> datetime:
+    for key in WORKOUT_ARCHIVE_TIMESTAMP_ATTRIBUTE_KEYS:
+        raw_value = attributes.get(key)
+        parsed = None
+        if isinstance(raw_value, str):
+            parsed = _parse_measurement_timestamp(raw_value.strip())
+        elif isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
+            parsed = _parse_measurement_timestamp(str(raw_value))
+        if parsed is not None:
+            return parsed
+    return datetime.now(timezone.utc)
+
+
+def _image_extension_from_content_type(content_type: str) -> str:
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    extension = WORKOUT_IMAGE_CONTENT_TYPE_EXTENSIONS.get(normalized)
+    if extension:
+        return extension
+
+    if "/" not in normalized:
+        return "img"
+    candidate = sanitize_identifier(normalized.split("/", 1)[1]).replace("_", "")
+    if candidate:
+        return candidate[:10]
+    return "img"
+
+
+def _workout_archive_fingerprint(metric_key: str, attributes: dict[str, Any]) -> str:
+    raw_workout_id = _first_nonempty_attribute_value(attributes, WORKOUT_ARCHIVE_ID_ATTRIBUTE_KEYS)
+    if raw_workout_id is not None:
+        sanitized_workout_id = sanitize_identifier(raw_workout_id)[:64]
+        return f"uuid_{sanitized_workout_id}"
+
+    workout_start = _first_nonempty_attribute_value(attributes, ("workout_start",))
+    workout_end = _first_nonempty_attribute_value(attributes, ("workout_end",))
+    workout_type = _first_nonempty_attribute_value(attributes, WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS)
+    measurement_timestamp = _first_nonempty_attribute_value(attributes, ("measurement_timestamp",))
+    signature_source = "|".join(
+        part
+        for part in (
+            _normalize_metric_key(metric_key),
+            workout_start,
+            workout_end,
+            workout_type,
+            measurement_timestamp,
+        )
+        if part
+    )
+    if not signature_source:
+        signature_source = f"{_normalize_metric_key(metric_key)}|{uuid4()}"
+    digest = hashlib.sha1(signature_source.encode(), usedforsecurity=False).hexdigest()[:16]
+    return f"sig_{digest}"
+
+
+def _workout_archive_file_name(
+    metric_key: str,
+    attributes: dict[str, Any],
+    content_type: str,
+) -> tuple[str, str, datetime, str]:
+    workout_timestamp = _workout_archive_timestamp(attributes).astimezone(timezone.utc)
+    timestamp_fragment = workout_timestamp.strftime("%Y%m%dT%H%M%SZ")
+    workout_fingerprint = _workout_archive_fingerprint(metric_key, attributes)
+    extension = _image_extension_from_content_type(content_type)
+    file_name = f"{timestamp_fragment}_{workout_fingerprint}.{extension}"
+    return file_name, workout_fingerprint, workout_timestamp, extension
+
+
+def _store_workout_archive_file(
+    archive_dir: Path,
+    file_name: str,
+    image_bytes: bytes,
+    workout_fingerprint: str,
+) -> int:
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    target_path = archive_dir / file_name
+    fingerprint_suffix = f"_{workout_fingerprint}"
+    replaced_count = 0
+    for existing in archive_dir.iterdir():
+        if not existing.is_file() or existing.name == file_name:
+            continue
+        if not existing.stem.endswith(fingerprint_suffix):
+            continue
+        try:
+            existing.unlink()
+            replaced_count += 1
+        except OSError:
+            _LOGGER.debug("Failed to remove older workout archive file: %s", existing)
+
+    temp_path = target_path.with_name(f".{target_path.name}.tmp")
+    with temp_path.open("wb") as handle:
+        handle.write(image_bytes)
+    temp_path.replace(target_path)
+    return replaced_count
+
+
+async def _async_archive_workout_image(
+    hass: HomeAssistant,
+    username: str,
+    metric_key: str,
+    content_type: str,
+    image_bytes: bytes,
+    attributes: dict[str, Any],
+) -> dict[str, Any]:
+    if _normalize_metric_key(metric_key) != WORKOUT_IMAGE_METRIC_KEY:
+        return attributes
+
+    file_name, workout_fingerprint, workout_timestamp, _extension = _workout_archive_file_name(
+        metric_key=metric_key,
+        attributes=attributes,
+        content_type=content_type,
+    )
+    sanitized_username = sanitize_identifier(username)
+    relative_path = f"{DOMAIN}/workouts/{sanitized_username}/{file_name}"
+    archive_dir = Path(hass.config.path("media")) / DOMAIN / "workouts" / sanitized_username
+
+    try:
+        replaced_count = await hass.async_add_executor_job(
+            _store_workout_archive_file,
+            archive_dir,
+            file_name,
+            image_bytes,
+            workout_fingerprint,
+        )
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Failed to archive workout image for '%s' (%s): %s",
+            username,
+            metric_key,
+            err,
+        )
+        return attributes
+
+    archived_attributes = dict(attributes)
+    archived_attributes["archive_file_name"] = file_name
+    archived_attributes["archive_relative_path"] = relative_path
+    archived_attributes["archive_local_url"] = f"/media/local/{relative_path}"
+    archived_attributes["archive_media_source_id"] = (
+        f"media-source://media_source/local/{relative_path}"
+    )
+    archived_attributes["archive_replaced_file_count"] = replaced_count
+    archived_attributes["archive_workout_fingerprint"] = workout_fingerprint
+    archived_attributes["archive_workout_timestamp"] = (
+        workout_timestamp.isoformat().replace("+00:00", "Z")
+    )
+    return archived_attributes
 
 
 def _parse_updated_at(raw: Any) -> datetime:
@@ -1670,6 +1858,16 @@ class HalthyPushView(HomeAssistantView):
                 status=403,
             )
 
+        for prepared_image in prepared_images:
+            prepared_image["attributes"] = await _async_archive_workout_image(
+                hass=hass,
+                username=username,
+                metric_key=prepared_image["metric_key"],
+                content_type=prepared_image["content_type"],
+                image_bytes=prepared_image["image_bytes"],
+                attributes=prepared_image["attributes"],
+            )
+
         created = 0
         updated = 0
         deleted = 0
@@ -2261,6 +2459,62 @@ class HalthyCommandAckView(HomeAssistantView):
         )
 
 
+async def _async_register_workout_card_module(hass: HomeAssistant) -> None:
+    """Expose and register the bundled Halthy workout card frontend module."""
+    domain_data = hass.data.get(DOMAIN)
+    if isinstance(domain_data, dict) and domain_data.get("workout_card_registered"):
+        return
+
+    module_path = Path(__file__).resolve().parent / WORKOUT_CARD_MODULE_FILENAME
+    if not module_path.exists():
+        _LOGGER.debug("Workout card module file missing at '%s'", module_path)
+        return
+
+    static_registered = False
+    try:
+        # Modern HA static path API.
+        from homeassistant.components.http import StaticPathConfig
+
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(WORKOUT_CARD_STATIC_URL, str(module_path), False)]
+        )
+        static_registered = True
+    except Exception:  # noqa: BLE001
+        try:
+            # Fallback for older HA cores.
+            hass.http.register_static_path(
+                WORKOUT_CARD_STATIC_URL,
+                str(module_path),
+                cache_headers=False,
+            )
+            static_registered = True
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning(
+                "Failed to register Halthy workout card static module '%s': %s",
+                WORKOUT_CARD_STATIC_URL,
+                err,
+            )
+
+    if not static_registered:
+        return
+
+    try:
+        from homeassistant.components import frontend
+
+        if hasattr(frontend, "async_register_extra_module_url"):
+            await frontend.async_register_extra_module_url(hass, WORKOUT_CARD_STATIC_URL)
+    except Exception as err:  # noqa: BLE001
+        # Keep static URL available even if frontend helper is unavailable.
+        _LOGGER.debug(
+            "Unable to auto-register workout card module URL '%s': %s",
+            WORKOUT_CARD_STATIC_URL,
+            err,
+        )
+
+    if isinstance(domain_data, dict):
+        domain_data["workout_card_registered"] = True
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up domain storage."""
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
@@ -2272,11 +2526,13 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.data[DOMAIN] = {
         "entries": {},
         "view_registered": False,
+        "workout_card_registered": False,
         "store": store,
         "stored_entries": stored_entries,
         "force_upload_timers": {},
         "daily_upload_reset_timers": {},
     }
+    await _async_register_workout_card_module(hass)
 
     async def _async_handle_force_upload_service(call: ServiceCall) -> None:
         domain_data = hass.data.get(DOMAIN, {})
@@ -2419,10 +2675,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         {
             "entries": {},
             "view_registered": False,
+            "workout_card_registered": False,
             "force_upload_timers": {},
             "daily_upload_reset_timers": {},
         },
     )
+    await _async_register_workout_card_module(hass)
     entries: dict[str, IntegrationRuntime] = domain_data["entries"]
     stored_entries: dict[str, Any] = domain_data.get("stored_entries", {})
     stored_entry = stored_entries.get(entry.entry_id, {})

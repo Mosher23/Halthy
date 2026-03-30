@@ -38,6 +38,44 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
    - **Display Name** (optional): shown as device name in Home Assistant
 4. Repeat for each person.
 
+## Built-in Workout Card
+
+Halthy includes a bundled Lovelace card: `custom:halthy-workout-card`.
+
+- The module is served by the integration and auto-registered on startup.
+- You can usually add the card directly to your dashboard without manual resource setup.
+- Manual fallback resource URL: `/halthy/halthy-workout-card.js`
+
+Minimal config:
+
+```yaml
+type: custom:halthy-workout-card
+user: your_username
+```
+
+The visual card editor detects configured Halthy users and proposes them for selection.
+
+## Workout Image Archive
+
+When the app uploads a workout route image, Halthy archives it in Home Assistant media storage.
+
+- Folder: `/config/media/halthy/workouts/<app_username>/`
+- Filename format: `<workout_timestamp>_<workout_fingerprint>.<ext>`
+- Timestamp source: `measurement_timestamp` with workout timestamp fallbacks
+
+Same-workout replacement:
+
+- Uploading a newer image for the same workout replaces older archived files for that workout.
+- Workout matching uses `workout_uuid` when available, with metadata fingerprint fallback.
+
+Workout image entity attributes include:
+
+- `archive_local_url`
+- `archive_media_source_id`
+- `archive_file_name`
+- `archive_workout_timestamp`
+- `archive_replaced_file_count`
+
 ## Integration Options
 
 Open **Settings -> Devices & Services -> Halthy -> Configure**.

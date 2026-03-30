@@ -109,6 +109,21 @@ WORKOUT_ATTRIBUTE_SOURCES: dict[str, tuple[str, ...]] = {
         "avg_respiratory_rate_brpm",
     ),
 }
+WORKOUT_METADATA_ATTRIBUTE_KEYS: tuple[str, ...] = (
+    "measurement_timestamp",
+    "workout_start",
+    "workout_end",
+    "workout_uuid",
+    "point_count",
+    "rendered_point_count",
+    "detailed_map",
+    "archive_file_name",
+    "archive_relative_path",
+    "archive_local_url",
+    "archive_media_source_id",
+    "archive_replaced_file_count",
+    "archive_workout_timestamp",
+)
 
 
 def _is_workout_metric(metric_key: str) -> bool:
@@ -223,6 +238,13 @@ def _workout_attributes(raw_attrs: dict[str, Any]) -> dict[str, Any]:
         if raw_value is None:
             continue
         normalized[label] = _format_workout_attribute_value(label, raw_value)
+    for key in WORKOUT_METADATA_ATTRIBUTE_KEYS:
+        value = attrs.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        normalized[key] = value
     return normalized
 
 

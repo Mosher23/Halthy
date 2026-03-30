@@ -15,10 +15,12 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 - Per-person setup with stable unique IDs and predictable entity IDs
 - Human-readable metric names with metric-specific icons and standardized units
 - Workout route map support (`image.*` entities)
+- Workout image archive in Home Assistant media storage with same-workout replacement
 - Optional Home Assistant activity logbook integration (configurable)
 - Optional import from Home Assistant sensors back into HealthKit (in app)
 - Optional raw export to InfluxDB for long-range history and Grafana dashboards
 - Home Assistant UI setup with multi-user ownership handling
+- Built-in `custom:halthy-workout-card` Lovelace card (latest workout + calendar)
 
 ## 🔄 How It Works
 
@@ -79,6 +81,46 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 1. Copy `custom_components/halthy` to `<config>/custom_components/`.
 2. Restart Home Assistant.
 3. Add integration from UI.
+
+
+## 🗂️ Built-in Workout Card
+
+Halthy now bundles a Lovelace card: `custom:halthy-workout-card`.
+
+- The integration auto-registers the card module at startup.
+- In most setups you can use the card immediately in dashboard YAML without adding a manual resource.
+- If your frontend cache is stale, hard refresh the browser.
+- Manual fallback resource URL: `/halthy/halthy-workout-card.js`
+
+Example:
+
+```yaml
+type: custom:halthy-workout-card
+user: your_username
+```
+
+The card visual editor can auto-detect configured Halthy users and suggest them for selection.
+
+## 🗃️ Workout Image Archive
+
+When the app uploads a workout route image, Halthy now archives it on disk:
+
+- Folder: `/config/media/halthy/workouts/<app_username>/`
+- Filename format: `<workout_timestamp>_<workout_fingerprint>.<ext>`
+- `workout_timestamp` is derived from workout payload timestamps (`measurement_timestamp`/`workout_end`)
+
+Same-workout replacement behavior:
+
+- If a newer image for the same workout is uploaded, the older archived file is replaced.
+- Workout identity uses `workout_uuid` when present, with fallback to workout metadata fingerprinting.
+
+Workout image entities expose archive metadata attributes including:
+
+- `archive_local_url`
+- `archive_media_source_id`
+- `archive_file_name`
+- `archive_workout_timestamp`
+- `archive_replaced_file_count`
 
 ## ⚙️ Home Assistant Integration Options
 
