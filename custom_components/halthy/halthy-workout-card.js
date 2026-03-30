@@ -123,7 +123,7 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     this._config = {
-      title: "Halthy Workouts",
+      title: "",
       user: resolvedUser,
       entity: resolvedEntity,
       workouts_attribute: undefined,
@@ -358,7 +358,9 @@ class HalthyWorkoutCard extends HTMLElement {
       return;
     }
 
-    this._title.textContent = this._config.title || "";
+    const renderedTitle = typeof this._config.title === "string" ? this._config.title.trim() : "";
+    this._title.textContent = renderedTitle;
+    this._title.style.display = renderedTitle ? "block" : "none";
 
     const entityId = this._resolvedEntityId();
     const stateObj = entityId ? this._hass.states[entityId] : null;
@@ -594,16 +596,18 @@ class HalthyWorkoutCard extends HTMLElement {
 
   _fallbackSingleWorkout(stateObj) {
     const attrs = stateObj.attributes || {};
+    const imageProxyUrl = this._imageProxyUrlForState(stateObj);
     const image = this._normalizeImageUrl(
       this._firstString(
         attrs.archive_local_url,
         attrs.archive_media_source_id,
         attrs.entity_picture,
         attrs.entity_picture_local,
+        imageProxyUrl,
         attrs.image,
         attrs.image_url,
         attrs.picture,
-        `/api/image_proxy/${stateObj.entity_id}`
+        stateObj.entity_id?.split(".")[0] === "image" ? `/api/image_proxy/${stateObj.entity_id}` : ""
       )
     );
 
@@ -912,10 +916,32 @@ class HalthyWorkoutCard extends HTMLElement {
       timestamp,
       dayKey,
       dateLabel,
-      image: `/media/local/${relativePath}`,
+      image: this._normalizeImageUrl(
+        this._firstString(
+          child.thumbnail,
+          child.url,
+          `/media/local/${relativePath}`
+        )
+      ),
       chips: [],
       entity_id: entityId,
     };
+  }
+
+  _imageProxyUrlForState(stateObj) {
+    if (!stateObj || typeof stateObj !== "object") {
+      return "";
+    }
+    if (typeof stateObj.entity_id !== "string" || !stateObj.entity_id.trim()) {
+      return "";
+    }
+    const attrs = stateObj.attributes || {};
+    const accessToken = this._firstString(attrs.access_token);
+    const base = `/api/image_proxy/${stateObj.entity_id}`;
+    if (!accessToken) {
+      return base;
+    }
+    return `${base}?token=${encodeURIComponent(accessToken)}`;
   }
 
   _archiveTimestampFromFileName(fileName) {
