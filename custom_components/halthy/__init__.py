@@ -2462,38 +2462,39 @@ class HalthyCommandAckView(HomeAssistantView):
 async def _async_register_workout_card_module(hass: HomeAssistant) -> None:
     """Expose and register the bundled Halthy workout card frontend module."""
     domain_data = hass.data.get(DOMAIN)
-    if isinstance(domain_data, dict) and domain_data.get("workout_card_registered"):
-        return
 
     module_path = Path(__file__).resolve().parent / WORKOUT_CARD_MODULE_FILENAME
     if not module_path.exists():
         _LOGGER.debug("Workout card module file missing at '%s'", module_path)
         return
 
-    static_registered = False
-    try:
-        # Modern HA static path API.
-        from homeassistant.components.http import StaticPathConfig
-
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(WORKOUT_CARD_STATIC_URL, str(module_path), False)]
-        )
-        static_registered = True
-    except Exception:  # noqa: BLE001
+    static_registered = bool(
+        isinstance(domain_data, dict) and domain_data.get("workout_card_registered")
+    )
+    if not static_registered:
         try:
-            # Fallback for older HA cores.
-            hass.http.register_static_path(
-                WORKOUT_CARD_STATIC_URL,
-                str(module_path),
-                cache_headers=False,
+            # Modern HA static path API.
+            from homeassistant.components.http import StaticPathConfig
+
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig(WORKOUT_CARD_STATIC_URL, str(module_path), False)]
             )
             static_registered = True
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.warning(
-                "Failed to register Halthy workout card static module '%s': %s",
-                WORKOUT_CARD_STATIC_URL,
-                err,
-            )
+        except Exception:  # noqa: BLE001
+            try:
+                # Fallback for older HA cores.
+                hass.http.register_static_path(
+                    WORKOUT_CARD_STATIC_URL,
+                    str(module_path),
+                    cache_headers=False,
+                )
+                static_registered = True
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Failed to register Halthy workout card static module '%s': %s",
+                    WORKOUT_CARD_STATIC_URL,
+                    err,
+                )
 
     if not static_registered:
         return
@@ -2511,8 +2512,98 @@ async def _async_register_workout_card_module(hass: HomeAssistant) -> None:
             err,
         )
 
+    try:
+        await _async_ensure_lovelace_module_resource(hass, WORKOUT_CARD_STATIC_URL)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug(
+            "Unable to auto-create Lovelace resource for '%s': %s",
+            WORKOUT_CARD_STATIC_URL,
+            err,
+        )
+
     if isinstance(domain_data, dict):
         domain_data["workout_card_registered"] = True
+
+
+async def _async_ensure_lovelace_module_resource(hass: HomeAssistant, module_url: str) -> None:
+    """Ensure dashboard resources include the bundled workout card module URL."""
+    lovelace_data = hass.data.get("lovelace")
+    if not isinstance(lovelace_data, dict):
+        return
+    resources = lovelace_data.get("resources")
+    if resources is None:
+        return
+
+    existing_resources = await _async_lovelace_resource_items(resources)
+    if _lovelace_resource_exists(existing_resources, module_url):
+        return
+
+    create_item = getattr(resources, "async_create_item", None)
+    if not callable(create_item):
+        return
+
+    last_error: Exception | None = None
+    for payload in (
+        {"url": module_url, "res_type": "module"},
+        {"url": module_url, "type": "module"},
+    ):
+        try:
+            created = create_item(payload)
+            if inspect.isawaitable(created):
+                await created
+            _LOGGER.info("Added Lovelace module resource for Halthy workout card: %s", module_url)
+            return
+        except Exception as err:  # noqa: BLE001
+            last_error = err
+
+    if last_error is not None:
+        _LOGGER.debug("Failed to create Lovelace module resource '%s': %s", module_url, last_error)
+
+
+async def _async_lovelace_resource_items(resources: Any) -> list[dict[str, Any]]:
+    """Return Lovelace resources from storage collection across HA versions."""
+    fetchers = ("async_items", "async_get_info")
+    for name in fetchers:
+        fetcher = getattr(resources, name, None)
+        if not callable(fetcher):
+            continue
+        try:
+            fetched = fetcher()
+            if inspect.isawaitable(fetched):
+                fetched = await fetched
+        except Exception:  # noqa: BLE001
+            continue
+
+        if isinstance(fetched, list):
+            return [item for item in fetched if isinstance(item, dict)]
+        if isinstance(fetched, dict):
+            values = fetched.get("items")
+            if isinstance(values, list):
+                return [item for item in values if isinstance(item, dict)]
+    return []
+
+
+def _lovelace_resource_exists(resources: list[dict[str, Any]], module_url: str) -> bool:
+    """Check whether Lovelace resources already contain the module URL."""
+    normalized_target = module_url.strip()
+    if not normalized_target:
+        return False
+    normalized_variants = {
+        normalized_target,
+        normalized_target.lstrip("/"),
+        f"/{normalized_target.lstrip('/')}",
+    }
+    for resource in resources:
+        resource_url = str(resource.get("url", resource.get("path", ""))).strip()
+        if not resource_url:
+            continue
+        if resource_url not in normalized_variants:
+            continue
+        resource_type = str(resource.get("res_type", resource.get("type", ""))).strip().lower()
+        if resource_type and resource_type != "module":
+            continue
+        return True
+    return False
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
