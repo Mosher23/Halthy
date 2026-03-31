@@ -175,10 +175,8 @@ class HalthyWorkoutCard extends HTMLElement {
         color: var(--secondary-text-color);
       }
       .workout-card {
-        border-radius: 14px;
-        overflow: hidden;
-        border: 1px solid var(--divider-color);
-        background: var(--card-background-color, #fff);
+        border: none;
+        background: transparent;
       }
       .latest-card-click {
         cursor: pointer;
@@ -186,6 +184,8 @@ class HalthyWorkoutCard extends HTMLElement {
       .thumb-wrap {
         position: relative;
         aspect-ratio: 16 / 10;
+        border-radius: 14px;
+        overflow: hidden;
         background: linear-gradient(135deg, #d8e2ec 0%, #b7cadc 100%);
       }
       .thumb {
@@ -204,7 +204,7 @@ class HalthyWorkoutCard extends HTMLElement {
         color: rgba(0, 0, 0, 0.35);
       }
       .meta {
-        padding: 10px 12px 12px;
+        padding: 10px 0 0;
       }
       .name {
         font-weight: 600;
@@ -433,7 +433,7 @@ class HalthyWorkoutCard extends HTMLElement {
       : `<div class="state">${this._escape(this._config.empty_message)}</div>`;
 
     this._content.innerHTML = `
-      <div>${latestHtml}</div>
+      ${latestHtml}
       ${
         this._config.use_media_archive && this._mediaLoading
           ? `<div class="state">Loading archived workouts from media folder...</div>`
@@ -443,7 +443,9 @@ class HalthyWorkoutCard extends HTMLElement {
     `;
 
     this._content.querySelectorAll('[data-action="open-calendar"]').forEach((openBtn) => {
-      openBtn.addEventListener("click", () => {
+      openBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         if (!workouts.length) {
           return;
         }
@@ -499,7 +501,10 @@ class HalthyWorkoutCard extends HTMLElement {
 
     const latestCard = this._content.querySelector(".latest-card-click");
     if (latestCard) {
-      latestCard.addEventListener("click", () => {
+      latestCard.addEventListener("click", (event) => {
+        if (event.target && typeof event.target.closest === "function" && event.target.closest("[data-action]")) {
+          return;
+        }
         this._fire("hass-more-info", { entityId });
       });
     }
