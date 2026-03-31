@@ -211,9 +211,37 @@ class HalthyWorkoutCard extends HTMLElement {
         line-height: 1.3;
       }
       .date {
-        margin-top: 4px;
         color: var(--secondary-text-color);
         font-size: 0.9rem;
+      }
+      .date-row {
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .calendar-inline-btn {
+        border: 1px solid var(--divider-color);
+        background: var(--card-background-color, #fff);
+        border-radius: 8px;
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-text-color);
+        cursor: pointer;
+      }
+      .calendar-inline-btn[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .calendar-inline-icon {
+        --mdc-icon-size: 18px;
       }
       .chips {
         margin-top: 8px;
@@ -398,20 +426,14 @@ class HalthyWorkoutCard extends HTMLElement {
 
     const latest = workouts[0] || null;
     const latestHtml = latest
-      ? `<div class="section-label">Latest workout</div>${this._renderWorkoutCard(
-          latest,
-          "latest-card-click"
-        )}`
+      ? this._renderWorkoutCard(latest, "latest-card-click", {
+          showCalendarButton: true,
+          calendarDisabled: !workouts.length,
+        })
       : `<div class="state">${this._escape(this._config.empty_message)}</div>`;
-
-    const calendarButtonLabel = this._config.calendar_button_label || "Open Workout Calendar";
-    const openDisabled = workouts.length ? "" : "disabled";
 
     this._content.innerHTML = `
       <div>${latestHtml}</div>
-      <button class="calendar-btn" data-action="open-calendar" ${openDisabled}>${this._escape(
-        calendarButtonLabel
-      )}</button>
       ${
         this._config.use_media_archive && this._mediaLoading
           ? `<div class="state">Loading archived workouts from media folder...</div>`
@@ -420,8 +442,7 @@ class HalthyWorkoutCard extends HTMLElement {
       ${this._calendarOpen ? this._renderCalendarModal(workoutsByDay) : ""}
     `;
 
-    const openBtn = this._content.querySelector('[data-action="open-calendar"]');
-    if (openBtn) {
+    this._content.querySelectorAll('[data-action="open-calendar"]').forEach((openBtn) => {
       openBtn.addEventListener("click", () => {
         if (!workouts.length) {
           return;
@@ -429,7 +450,7 @@ class HalthyWorkoutCard extends HTMLElement {
         this._calendarOpen = true;
         this._render();
       });
-    }
+    });
 
     const closeBtn = this._content.querySelector('[data-action="close-calendar"]');
     if (closeBtn) {
@@ -661,7 +682,7 @@ class HalthyWorkoutCard extends HTMLElement {
     return map;
   }
 
-  _renderWorkoutCard(workout, extraClass = "") {
+  _renderWorkoutCard(workout, extraClass = "", options = {}) {
     const imageHtml = workout.image
       ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(
           workout.title || "Workout"
@@ -671,13 +692,32 @@ class HalthyWorkoutCard extends HTMLElement {
     const chips = workout.chips
       .map((chip) => `<span class="chip">${this._escape(chip)}</span>`)
       .join("");
+    const showCalendarButton = options.showCalendarButton === true;
+    const calendarDisabled = options.calendarDisabled === true;
+    const calendarButtonHtml = showCalendarButton
+      ? `<button
+          class="calendar-inline-btn"
+          data-action="open-calendar"
+          ${calendarDisabled ? "disabled" : ""}
+          aria-label="Open workout calendar"
+          title="Open workout calendar"
+        >
+          <ha-icon class="calendar-inline-icon" icon="mdi:calendar-month"></ha-icon>
+        </button>`
+      : "";
+    const dateRowHtml = workout.dateLabel || calendarButtonHtml
+      ? `<div class="date-row">
+          ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : "<div></div>"}
+          ${calendarButtonHtml}
+        </div>`
+      : "";
 
     return `
       <article class="workout-card ${this._escapeAttr(extraClass)}">
         <div class="thumb-wrap">${imageHtml}</div>
         <div class="meta">
           <div class="name">${this._escape(workout.title || "Workout")}</div>
-          ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : ""}
+          ${dateRowHtml}
           ${chips ? `<div class="chips">${chips}</div>` : ""}
         </div>
       </article>
