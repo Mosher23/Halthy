@@ -94,6 +94,11 @@ from .units import canonical_unit, resolve_temperature_state
 
 _LOGGER = logging.getLogger(__name__)
 
+try:
+    from homeassistant.components.lovelace.const import LOVELACE_DATA as LOVELACE_DATA_KEY
+except Exception:  # noqa: BLE001
+    LOVELACE_DATA_KEY = "lovelace"
+
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_runtime"
 SAVE_DELAY_SECONDS = 5
@@ -2527,11 +2532,9 @@ async def _async_register_workout_card_module(hass: HomeAssistant) -> None:
 
 async def _async_ensure_lovelace_module_resource(hass: HomeAssistant, module_url: str) -> None:
     """Ensure dashboard resources include the bundled workout card module URL."""
-    lovelace_data = hass.data.get("lovelace")
-    if not isinstance(lovelace_data, dict):
-        return
-    resources = lovelace_data.get("resources")
+    resources = _lovelace_resource_collection(hass)
     if resources is None:
+        _schedule_lovelace_resource_retry(hass)
         return
 
     existing_resources = await _async_lovelace_resource_items(resources)
@@ -2560,26 +2563,61 @@ async def _async_ensure_lovelace_module_resource(hass: HomeAssistant, module_url
         _LOGGER.debug("Failed to create Lovelace module resource '%s': %s", module_url, last_error)
 
 
+def _lovelace_resource_collection(hass: HomeAssistant) -> Any | None:
+    """Return the Lovelace resources collection across HA versions."""
+    for key in (LOVELACE_DATA_KEY, "lovelace"):
+        lovelace_data = hass.data.get(key)
+        if lovelace_data is None:
+            continue
+        if isinstance(lovelace_data, dict):
+            resources = lovelace_data.get("resources")
+        else:
+            resources = getattr(lovelace_data, "resources", None)
+        if resources is not None:
+            return resources
+    return None
+
+
+def _schedule_lovelace_resource_retry(hass: HomeAssistant) -> None:
+    """Retry resource registration once Home Assistant has fully started."""
+    domain_data = hass.data.get(DOMAIN)
+    if not isinstance(domain_data, dict):
+        return
+    if domain_data.get("workout_card_resource_retry_scheduled"):
+        return
+
+    @callback
+    def _async_retry_lovelace_resource(_event: Any) -> None:
+        runtime_domain_data = hass.data.get(DOMAIN)
+        if isinstance(runtime_domain_data, dict):
+            runtime_domain_data["workout_card_resource_retry_scheduled"] = False
+        hass.async_create_task(_async_register_workout_card_module(hass))
+
+    hass.bus.async_listen_once("homeassistant_started", _async_retry_lovelace_resource)
+    domain_data["workout_card_resource_retry_scheduled"] = True
+
+
 async def _async_lovelace_resource_items(resources: Any) -> list[dict[str, Any]]:
     """Return Lovelace resources from storage collection across HA versions."""
-    fetchers = ("async_items", "async_get_info")
-    for name in fetchers:
-        fetcher = getattr(resources, name, None)
-        if not callable(fetcher):
-            continue
+    info_fetcher = getattr(resources, "async_get_info", None)
+    if callable(info_fetcher):
         try:
-            fetched = fetcher()
-            if inspect.isawaitable(fetched):
-                fetched = await fetched
+            fetched_info = info_fetcher()
+            if inspect.isawaitable(fetched_info):
+                await fetched_info
         except Exception:  # noqa: BLE001
-            continue
+            pass
 
-        if isinstance(fetched, list):
-            return [item for item in fetched if isinstance(item, dict)]
-        if isinstance(fetched, dict):
-            values = fetched.get("items")
-            if isinstance(values, list):
-                return [item for item in values if isinstance(item, dict)]
+    items_fetcher = getattr(resources, "async_items", None)
+    if callable(items_fetcher):
+        try:
+            fetched_items = items_fetcher()
+            if inspect.isawaitable(fetched_items):
+                fetched_items = await fetched_items
+        except Exception:  # noqa: BLE001
+            fetched_items = []
+        if isinstance(fetched_items, list):
+            return [item for item in fetched_items if isinstance(item, dict)]
     return []
 
 
@@ -2618,6 +2656,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         "entries": {},
         "view_registered": False,
         "workout_card_registered": False,
+        "workout_card_resource_retry_scheduled": False,
         "store": store,
         "stored_entries": stored_entries,
         "force_upload_timers": {},
@@ -2767,6 +2806,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "entries": {},
             "view_registered": False,
             "workout_card_registered": False,
+            "workout_card_resource_retry_scheduled": False,
             "force_upload_timers": {},
             "daily_upload_reset_timers": {},
         },
