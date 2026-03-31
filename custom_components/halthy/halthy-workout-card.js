@@ -104,6 +104,7 @@ class HalthyWorkoutCard extends HTMLElement {
     this._mediaWorkoutsLoaded = false;
     this._lastArchiveFileName = "";
     this._mediaLoadSeq = 0;
+    this._imageObjectUrls = new Set();
   }
 
   setConfig(config) {
@@ -358,6 +359,8 @@ class HalthyWorkoutCard extends HTMLElement {
       return;
     }
 
+    this._revokeImageObjectUrls();
+
     const renderedTitle = typeof this._config.title === "string" ? this._config.title.trim() : "";
     this._title.textContent = renderedTitle;
     this._title.style.display = renderedTitle ? "block" : "none";
@@ -599,15 +602,15 @@ class HalthyWorkoutCard extends HTMLElement {
     const imageProxyUrl = this._imageProxyUrlForState(stateObj);
     const image = this._normalizeImageUrl(
       this._firstString(
-        attrs.archive_local_url,
-        attrs.archive_media_source_id,
+        imageProxyUrl,
         attrs.entity_picture,
         attrs.entity_picture_local,
-        imageProxyUrl,
         attrs.image,
         attrs.image_url,
         attrs.picture,
-        stateObj.entity_id?.split(".")[0] === "image" ? `/api/image_proxy/${stateObj.entity_id}` : ""
+        stateObj.entity_id?.split(".")[0] === "image" ? `/api/image_proxy/${stateObj.entity_id}` : "",
+        attrs.archive_media_source_id,
+        attrs.archive_local_url
       )
     );
 
@@ -929,20 +932,18 @@ class HalthyWorkoutCard extends HTMLElement {
 
   async _resolvedMediaImageUrl(child, mediaSourceId, relativePath) {
     const preferredDirect = this._normalizeImageUrl(this._firstString(child.thumbnail, child.url));
-    if (preferredDirect && !this._isProtectedMediaLocalUrl(preferredDirect)) {
-      return preferredDirect;
+    const preferredAuthSafe = await this._authSafeImageUrl(preferredDirect);
+    if (preferredAuthSafe) {
+      return preferredAuthSafe;
     }
 
     const resolvedViaMediaSource = await this._resolveMediaSourceUrl(mediaSourceId);
-    if (resolvedViaMediaSource) {
-      return resolvedViaMediaSource;
+    const resolvedMediaSourceAuthSafe = await this._authSafeImageUrl(resolvedViaMediaSource);
+    if (resolvedMediaSourceAuthSafe) {
+      return resolvedMediaSourceAuthSafe;
     }
 
-    if (preferredDirect) {
-      return preferredDirect;
-    }
-
-    return this._normalizeImageUrl(`/media/local/${relativePath}`);
+    return await this._authSafeImageUrl(this._normalizeImageUrl(`/media/local/${relativePath}`));
   }
 
   _isProtectedMediaLocalUrl(url) {
@@ -974,6 +975,78 @@ class HalthyWorkoutCard extends HTMLElement {
     } catch (_error) {
       return null;
     }
+  }
+
+  async _authSafeImageUrl(url) {
+    const normalized = this._normalizeImageUrl(url);
+    if (!normalized) {
+      return null;
+    }
+    if (!this._isProtectedMediaLocalUrl(normalized)) {
+      return normalized;
+    }
+
+    const absoluteUrl = this._absoluteUrl(normalized);
+    const token = this._hass?.auth?.data?.access_token;
+    if (!absoluteUrl || !token || typeof fetch !== "function") {
+      return null;
+    }
+
+    try {
+      const response = await fetch(absoluteUrl, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "omit",
+      });
+      if (!response.ok) {
+        return null;
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      this._imageObjectUrls.add(objectUrl);
+      return objectUrl;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  _absoluteUrl(url) {
+    if (!url || typeof url !== "string") {
+      return "";
+    }
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return "";
+    }
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    if (this._hass && typeof this._hass.hassUrl === "function") {
+      try {
+        return this._hass.hassUrl(trimmed.startsWith("/") ? trimmed : `/${trimmed}`);
+      } catch (_error) {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
+  _revokeImageObjectUrls() {
+    if (!this._imageObjectUrls || !this._imageObjectUrls.size) {
+      return;
+    }
+    for (const objectUrl of this._imageObjectUrls) {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (_error) {
+        // No-op.
+      }
+    }
+    this._imageObjectUrls.clear();
+  }
+
+  disconnectedCallback() {
+    this._revokeImageObjectUrls();
   }
 
   _imageProxyUrlForState(stateObj) {
