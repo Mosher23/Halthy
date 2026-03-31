@@ -130,6 +130,7 @@ class HalthyWorkoutCard extends HTMLElement {
       workouts_attribute: undefined,
       use_media_archive: true,
       empty_message: "No workouts found.",
+      calendar_icon: "mdi:calendar-month",
       calendar_button_label: "Open Workout Calendar",
       calendar_empty_day_message: "Select a highlighted day to view its workout image.",
       ...config,
@@ -707,7 +708,7 @@ class HalthyWorkoutCard extends HTMLElement {
           aria-label="Open workout calendar"
           title="Open workout calendar"
         >
-          <ha-icon class="calendar-inline-icon" icon="mdi:calendar-month"></ha-icon>
+          <ha-icon class="calendar-inline-icon" icon="${this._escapeAttr(this._calendarIcon())}"></ha-icon>
         </button>`
       : "";
     const dateRowHtml = workout.dateLabel || calendarButtonHtml
@@ -1300,6 +1301,11 @@ class HalthyWorkoutCard extends HTMLElement {
     }).format(parsed);
   }
 
+  _calendarIcon() {
+    const value = typeof this._config?.calendar_icon === "string" ? this._config.calendar_icon.trim() : "";
+    return value || "mdi:calendar-month";
+  }
+
   _fire(type, detail = {}) {
     this.dispatchEvent(
       new CustomEvent(type, {
@@ -1335,7 +1341,13 @@ class HalthyWorkoutCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this._users = _detectHalthyUsersFromStates(hass && hass.states);
+    const nextUsers = _detectHalthyUsersFromStates(hass && hass.states);
+    const nextUsersSignature = nextUsers.map((user) => `${user.id}:${user.label}`).join("|");
+    if (this._usersSignature === nextUsersSignature && this.shadowRoot) {
+      return;
+    }
+    this._users = nextUsers;
+    this._usersSignature = nextUsersSignature;
     this._render();
   }
 
@@ -1434,6 +1446,13 @@ class HalthyWorkoutCardEditor extends HTMLElement {
           )}" />
         </div>
 
+        <div class="field">
+          <label for="calendar_icon">Calendar icon</label>
+          <input id="calendar_icon" type="text" placeholder="mdi:calendar-month" value="${this._escapeAttr(
+            this._config.calendar_icon || "mdi:calendar-month"
+          )}" />
+        </div>
+
         <div class="toggle-row">
           <input id="use_media_archive" type="checkbox" ${
             this._config.use_media_archive !== false ? "checked" : ""
@@ -1447,6 +1466,7 @@ class HalthyWorkoutCardEditor extends HTMLElement {
     const entityInput = this.shadowRoot.getElementById("entity");
     const titleInput = this.shadowRoot.getElementById("title");
     const workoutsAttributeInput = this.shadowRoot.getElementById("workouts_attribute");
+    const calendarIconInput = this.shadowRoot.getElementById("calendar_icon");
     const mediaArchiveInput = this.shadowRoot.getElementById("use_media_archive");
 
     if (userSelect) {
@@ -1490,6 +1510,15 @@ class HalthyWorkoutCardEditor extends HTMLElement {
         const value = String(event.target.value || "").trim();
         this._emitConfig({
           workouts_attribute: value || undefined,
+        });
+      });
+    }
+
+    if (calendarIconInput) {
+      calendarIconInput.addEventListener("change", (event) => {
+        const value = String(event.target.value || "").trim();
+        this._emitConfig({
+          calendar_icon: value || "mdi:calendar-month",
         });
       });
     }
