@@ -835,10 +835,13 @@ class HalthyWorkoutCard extends HTMLElement {
       });
 
       const children = Array.isArray(response?.children) ? response.children : [];
-      const workouts = children
-        .filter((child) => this._isImageMediaChild(child))
-        .map((child) => this._workoutFromMediaChild(child, entityId))
-        .filter((item) => item !== null);
+      const workouts = (
+        await Promise.all(
+          children
+            .filter((child) => this._isImageMediaChild(child))
+            .map((child) => this._workoutFromMediaChildAsync(child, entityId))
+        )
+      ).filter((item) => item !== null);
 
       this._sortWorkouts(workouts);
       if (loadSeq !== this._mediaLoadSeq) {
@@ -895,7 +898,7 @@ class HalthyWorkoutCard extends HTMLElement {
     return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(title);
   }
 
-  _workoutFromMediaChild(child, entityId) {
+  async _workoutFromMediaChildAsync(child, entityId) {
     const mediaSourceId = this._firstString(child.media_content_id);
     const relativePath = this._relativePathFromMediaSourceId(mediaSourceId);
     if (!relativePath) {
@@ -911,21 +914,66 @@ class HalthyWorkoutCard extends HTMLElement {
     const dateLabel = timestamp ? this._formatDate(timestamp) : "";
     const dayKey = timestamp ? this._dayKey(timestamp) : "";
 
+    const resolvedImage = await this._resolvedMediaImageUrl(child, mediaSourceId, relativePath);
+
     return {
       title: "Workout",
       timestamp,
       dayKey,
       dateLabel,
-      image: this._normalizeImageUrl(
-        this._firstString(
-          child.thumbnail,
-          child.url,
-          `/media/local/${relativePath}`
-        )
-      ),
+      image: resolvedImage,
       chips: [],
       entity_id: entityId,
     };
+  }
+
+  async _resolvedMediaImageUrl(child, mediaSourceId, relativePath) {
+    const preferredDirect = this._normalizeImageUrl(this._firstString(child.thumbnail, child.url));
+    if (preferredDirect && !this._isProtectedMediaLocalUrl(preferredDirect)) {
+      return preferredDirect;
+    }
+
+    const resolvedViaMediaSource = await this._resolveMediaSourceUrl(mediaSourceId);
+    if (resolvedViaMediaSource) {
+      return resolvedViaMediaSource;
+    }
+
+    if (preferredDirect) {
+      return preferredDirect;
+    }
+
+    return this._normalizeImageUrl(`/media/local/${relativePath}`);
+  }
+
+  _isProtectedMediaLocalUrl(url) {
+    if (!url || typeof url !== "string") {
+      return false;
+    }
+    const normalized = url.trim().toLowerCase();
+    return normalized.startsWith("/media/local/") || normalized.includes("/media/local/");
+  }
+
+  async _resolveMediaSourceUrl(mediaSourceId) {
+    if (!mediaSourceId || typeof mediaSourceId !== "string") {
+      return null;
+    }
+    if (!this._hass || typeof this._hass.callWS !== "function") {
+      return null;
+    }
+
+    try {
+      const resolved = await this._hass.callWS({
+        type: "media_source/resolve_media",
+        media_content_id: mediaSourceId,
+      });
+      const resolvedUrl = this._firstString(resolved?.url);
+      if (!resolvedUrl) {
+        return null;
+      }
+      return this._normalizeImageUrl(resolvedUrl);
+    } catch (_error) {
+      return null;
+    }
   }
 
   _imageProxyUrlForState(stateObj) {
@@ -1054,7 +1102,18 @@ class HalthyWorkoutCard extends HTMLElement {
       return trimmed;
     }
 
-    if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+
+    if (trimmed.startsWith("/")) {
+      if (this._hass && typeof this._hass.hassUrl === "function") {
+        try {
+          return this._hass.hassUrl(trimmed);
+        } catch (_error) {
+          return trimmed;
+        }
+      }
       return trimmed;
     }
 
