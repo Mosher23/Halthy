@@ -123,6 +123,11 @@ WORKOUT_METADATA_ATTRIBUTE_KEYS: tuple[str, ...] = (
     "archive_media_source_id",
     "archive_replaced_file_count",
     "archive_workout_timestamp",
+    "workout_zone_groups",
+    "heart_rate_zones",
+    "heart_rate_zone_total_duration_s",
+    "cycling_power_zones",
+    "cycling_power_zone_total_duration_s",
 )
 
 

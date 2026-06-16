@@ -6,6 +6,7 @@ import asyncio
 import dataclasses
 from datetime import datetime, timezone
 import importlib.util
+import os
 import pathlib
 import sys
 import tempfile
@@ -14,6 +15,13 @@ import unittest
 
 
 def _install_homeassistant_stubs() -> None:
+    if "voluptuous" not in sys.modules:
+        voluptuous_module = types.ModuleType("voluptuous")
+        voluptuous_module.Schema = lambda schema, *args, **kwargs: schema
+        voluptuous_module.Optional = lambda key, *args, **kwargs: key
+        voluptuous_module.Required = lambda key, *args, **kwargs: key
+        sys.modules["voluptuous"] = voluptuous_module
+
     if "aiohttp" not in sys.modules:
         aiohttp_module = types.ModuleType("aiohttp")
         web_module = types.SimpleNamespace(
@@ -93,6 +101,15 @@ def _install_homeassistant_stubs() -> None:
     if "homeassistant.helpers" not in sys.modules:
         sys.modules["homeassistant.helpers"] = types.ModuleType("homeassistant.helpers")
 
+    config_validation_module = sys.modules.setdefault(
+        "homeassistant.helpers.config_validation",
+        types.ModuleType("homeassistant.helpers.config_validation"),
+    )
+    if not hasattr(config_validation_module, "string"):
+        config_validation_module.string = str
+    if not hasattr(config_validation_module, "config_entry_only_config_schema"):
+        config_validation_module.config_entry_only_config_schema = lambda domain: {domain: {}}
+
     entity_registry_module = sys.modules.setdefault(
         "homeassistant.helpers.entity_registry",
         types.ModuleType("homeassistant.helpers.entity_registry"),
@@ -108,6 +125,15 @@ def _install_homeassistant_stubs() -> None:
     )
     if not hasattr(dispatcher_module, "async_dispatcher_send"):
         dispatcher_module.async_dispatcher_send = lambda *_args, **_kwargs: None
+
+    event_module = sys.modules.setdefault(
+        "homeassistant.helpers.event",
+        types.ModuleType("homeassistant.helpers.event"),
+    )
+    if not hasattr(event_module, "async_track_time_change"):
+        event_module.async_track_time_change = lambda *_args, **_kwargs: (lambda: None)
+    if not hasattr(event_module, "async_track_time_interval"):
+        event_module.async_track_time_interval = lambda *_args, **_kwargs: (lambda: None)
 
     storage_module = sys.modules.setdefault(
         "homeassistant.helpers.storage",
@@ -140,6 +166,19 @@ def _install_homeassistant_stubs() -> None:
     )
     if not hasattr(core_module, "HomeAssistant"):
         core_module.HomeAssistant = type("HomeAssistant", (), {})
+    if not hasattr(core_module, "ServiceCall"):
+        core_module.ServiceCall = type("ServiceCall", (), {"data": {}})
+    if not hasattr(core_module, "callback"):
+        core_module.callback = lambda func: func
+
+    if "homeassistant.util" not in sys.modules:
+        sys.modules["homeassistant.util"] = types.ModuleType("homeassistant.util")
+    dt_module = sys.modules.setdefault(
+        "homeassistant.util.dt",
+        types.ModuleType("homeassistant.util.dt"),
+    )
+    if not hasattr(dt_module, "now"):
+        dt_module.now = lambda: datetime.now(timezone.utc)
 
 
 def _load_integration_module():
@@ -192,10 +231,59 @@ BRIDGE = _load_integration_module()
 
 
 class StatisticsHelpersTests(unittest.TestCase):
+    def test_workout_archive_timestamp_from_file_name_formats(self) -> None:
+        self.assertEqual(
+            BRIDGE._workout_archive_timestamp_from_file_name("20260323T123436Z_uuid_test.jpg"),
+            datetime(2026, 3, 23, 12, 34, 36, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            BRIDGE._workout_archive_timestamp_from_file_name("workout_2026-04-01_10-11-12_map.png"),
+            datetime(2026, 4, 1, 10, 11, 12, tzinfo=timezone.utc),
+        )
+        self.assertEqual(
+            BRIDGE._workout_archive_timestamp_from_file_name("route_20260402.jpg"),
+            datetime(2026, 4, 2, 0, 0, 0, tzinfo=timezone.utc),
+        )
+
+    def test_collect_workout_archive_records_includes_legacy_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = pathlib.Path(temp_dir)
+            modern_dir = media_root / "halthy" / "workouts" / "tester"
+            legacy_dir = media_root / "halthy_bridge" / "workouts" / "tester"
+            modern_dir.mkdir(parents=True, exist_ok=True)
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+
+            modern_file = modern_dir / "20260401T101112Z_uuid_modern.jpg"
+            legacy_file = legacy_dir / "20260323T123436Z_uuid_legacy.png"
+            modern_file.write_bytes(b"modern")
+            legacy_file.write_bytes(b"legacy")
+            os.utime(modern_file, (1711966272, 1711966272))
+            os.utime(legacy_file, (1710765276, 1710765276))
+
+            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+
+            self.assertEqual(len(records), 2)
+            self.assertEqual(records[0]["file_name"], "20260401T101112Z_uuid_modern.jpg")
+            self.assertEqual(records[0]["day_key"], "2026-04-01")
+            self.assertEqual(records[1]["file_name"], "20260323T123436Z_uuid_legacy.png")
+            self.assertEqual(records[1]["day_key"], "2026-03-23")
+            self.assertTrue(records[0]["local_url"].startswith("/media/local/"))
+            self.assertIn("/halthy/workouts/tester/", records[0]["local_url"])
+
+    def test_workout_archive_image_url_is_tokenized(self) -> None:
+        url = BRIDGE._workout_archive_image_url(
+            "tester_1",
+            "halthy/workouts/tester_1/20260401T101112Z_uuid.jpg",
+            "abc123",
+        )
+        self.assertIn("/api/halthy/workout_image?", url)
+        self.assertIn("username=tester_1", url)
+        self.assertIn("token=abc123", url)
+
     def test_workout_archive_file_name_uses_timestamp_and_workout_uuid(self) -> None:
         file_name, workout_fingerprint, workout_timestamp, extension = (
             BRIDGE._workout_archive_file_name(
-                metric_key="workout_route_map",
+                metric_key="workout",
                 attributes={
                     "measurement_timestamp": "2026-03-28T18:15:12Z",
                     "workout_uuid": "ABCD-1234",
@@ -203,23 +291,28 @@ class StatisticsHelpersTests(unittest.TestCase):
                 content_type="image/jpeg",
             )
         )
+        expected_fingerprint = "uuid_abcd_1234"
 
-        self.assertEqual(workout_fingerprint, "uuid_abcd_1234")
+        self.assertEqual(workout_fingerprint, expected_fingerprint)
         self.assertEqual(extension, "jpg")
         self.assertEqual(
             workout_timestamp,
             datetime(2026, 3, 28, 18, 15, 12, tzinfo=timezone.utc),
         )
-        self.assertEqual(file_name, "20260328T181512Z_uuid_abcd_1234.jpg")
+        self.assertEqual(file_name, f"20260328T181512Z_{expected_fingerprint}.jpg")
 
     def test_store_workout_archive_file_replaces_files_for_same_workout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             archive_dir = pathlib.Path(temp_dir)
-            old_same_workout_jpg = archive_dir / "20260328T181512Z_uuid_abcd_1234.jpg"
-            old_same_workout_png = archive_dir / "20260328T181513Z_uuid_abcd_1234.png"
+            old_same_workout_jpg = archive_dir / "20260328T181512Z_uuid_abcd_1234_abc123def4.jpg"
+            old_same_workout_png = archive_dir / "20260328T181513Z_uuid_abcd_1234_abc123def4.png"
+            old_same_workout_stable_key = archive_dir / "20260328T181519Z_uuid_abcd_1234.jpg"
+            old_same_workout_metadata = archive_dir / "20260328T181519Z_uuid_abcd_1234.json"
             other_workout_file = archive_dir / "20260328T181514Z_uuid_other_5678.jpg"
             old_same_workout_jpg.write_bytes(b"old_jpg")
             old_same_workout_png.write_bytes(b"old_png")
+            old_same_workout_stable_key.write_bytes(b"old_stable")
+            old_same_workout_metadata.write_text("{}", encoding="utf-8")
             other_workout_file.write_bytes(b"other")
 
             replaced_count = BRIDGE._store_workout_archive_file(
@@ -229,14 +322,74 @@ class StatisticsHelpersTests(unittest.TestCase):
                 workout_fingerprint="uuid_abcd_1234",
             )
 
-            self.assertEqual(replaced_count, 2)
+            self.assertEqual(replaced_count, 3)
             self.assertFalse(old_same_workout_jpg.exists())
             self.assertFalse(old_same_workout_png.exists())
+            self.assertFalse(old_same_workout_stable_key.exists())
+            self.assertFalse(old_same_workout_metadata.exists())
             self.assertTrue(other_workout_file.exists())
             self.assertEqual(
                 (archive_dir / "20260328T181520Z_uuid_abcd_1234.jpg").read_bytes(),
                 b"new_image",
             )
+
+    def test_workout_archive_metadata_is_written_and_collected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = pathlib.Path(temp_dir)
+            archive_dir = media_root / "halthy" / "workouts" / "tester"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            file_name = "20260401T101112Z_uuid_abcd_1234.jpg"
+            (archive_dir / file_name).write_bytes(b"image")
+
+            BRIDGE._store_workout_archive_metadata(
+                archive_dir,
+                file_name,
+                {
+                    "workout_type": "Walking",
+                    "workout_distance_m": 1234.5,
+                    "workout_duration_s": 1800,
+                    "ignored_route_payload": [{"lat": 1}],
+                },
+            )
+
+            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+
+            self.assertEqual(records[0]["title"], "Walking")
+            self.assertEqual(records[0]["workout_distance_m"], 1234.5)
+            self.assertEqual(records[0]["workout_duration_s"], 1800)
+            self.assertNotIn("ignored_route_payload", records[0])
+
+    def test_workout_archive_file_name_uses_timestamp_fallback_key(self) -> None:
+        file_name, workout_fingerprint, workout_timestamp, extension = (
+            BRIDGE._workout_archive_file_name(
+                metric_key="workout",
+                attributes={
+                    "timestamp": "2026-04-04T07:01:02Z",
+                    "workout_uuid": "ABCD-1234",
+                },
+                content_type="image/jpeg",
+            )
+        )
+        expected_fingerprint = "uuid_abcd_1234"
+
+        self.assertEqual(workout_fingerprint, expected_fingerprint)
+        self.assertEqual(
+            workout_timestamp,
+            datetime(2026, 4, 4, 7, 1, 2, tzinfo=timezone.utc),
+        )
+        self.assertEqual(extension, "jpg")
+        self.assertEqual(file_name, f"20260404T070102Z_{expected_fingerprint}.jpg")
+
+    def test_numeric_state_value_accepts_numeric_strings_with_units(self) -> None:
+        self.assertEqual(BRIDGE._numeric_state_value("72"), 72.0)
+        self.assertEqual(BRIDGE._numeric_state_value("72,5"), 72.5)
+        self.assertEqual(BRIDGE._numeric_state_value("72 bpm"), 72.0)
+        self.assertEqual(BRIDGE._numeric_state_value("36.5 °C"), 36.5)
+        self.assertIsNone(BRIDGE._numeric_state_value("not-a-number"))
+
+    def test_measurement_timestamp_value_uses_fallback_keys(self) -> None:
+        attrs = {"timestamp": "2026-04-02T10:11:12Z"}
+        self.assertEqual(BRIDGE._measurement_timestamp_value(attrs), "2026-04-02T10:11:12Z")
 
     def test_prepare_statistics_uses_top_of_hour_buckets(self) -> None:
         runtime = BRIDGE.IntegrationRuntime(

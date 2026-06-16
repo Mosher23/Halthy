@@ -98,13 +98,21 @@ class HalthyWorkoutCard extends HTMLElement {
     this._calendarOpen = false;
     this._calendarMonth = null;
     this._selectedDayKey = "";
-    this._mediaArchiveFolder = "";
+    this._selectedWorkoutIndex = 0;
+    this._currentWorkoutIndex = 0;
     this._mediaWorkouts = [];
     this._mediaLoading = false;
     this._mediaWorkoutsLoaded = false;
     this._lastArchiveFileName = "";
     this._mediaLoadSeq = 0;
+    this._apiArchiveWorkouts = [];
+    this._apiLoading = false;
+    this._apiWorkoutsLoaded = false;
+    this._apiLoadSeq = 0;
+    this._apiArchiveUser = "";
     this._imageObjectUrls = new Set();
+    this._lastStateSignature = "";
+    this._mediaArchiveFoldersKey = "";
   }
 
   setConfig(config) {
@@ -135,19 +143,44 @@ class HalthyWorkoutCard extends HTMLElement {
       calendar_empty_day_message: "Select a highlighted day to view its workout image.",
       ...config,
     };
+    this._lastStateSignature = "";
+    this._apiArchiveUser = "";
+    this._apiWorkoutsLoaded = false;
+    this._apiArchiveWorkouts = [];
+    this._selectedWorkoutIndex = 0;
+    this._currentWorkoutIndex = 0;
 
     if (!this._card) {
       this._buildCard();
+    }
+
+    if (this._hass && this._card) {
+      this._render();
     }
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._render();
+    if (!this._config || !this._card) {
+      return;
+    }
+
+    const entityId = this._resolvedEntityId();
+    const nextStateObj = entityId ? hass.states?.[entityId] : null;
+    const nextSignature = this._stateSignature(nextStateObj);
+    if (!this._lastStateSignature) {
+      this._lastStateSignature = nextSignature;
+      this._render();
+      return;
+    }
+    if (nextSignature !== this._lastStateSignature) {
+      this._lastStateSignature = nextSignature;
+      this._render();
+    }
   }
 
   getCardSize() {
-    return this._calendarOpen ? 8 : 5;
+    return this._calendarOpen ? 10 : 5;
   }
 
   _buildCard() {
@@ -164,11 +197,11 @@ class HalthyWorkoutCard extends HTMLElement {
         display: block;
       }
       .content {
-        padding: 0 16px 16px;
+        padding: 0 0 16px;
       }
       .state {
         color: var(--secondary-text-color);
-        padding: 4px 0;
+        padding: 4px 16px;
       }
       .section-label {
         margin-bottom: 8px;
@@ -184,20 +217,53 @@ class HalthyWorkoutCard extends HTMLElement {
       }
       .thumb-wrap {
         position: relative;
-        aspect-ratio: 16 / 10;
         border-radius: 14px;
         overflow: hidden;
-        background: linear-gradient(135deg, #d8e2ec 0%, #b7cadc 100%);
+        background: transparent;
+        line-height: 0;
+      }
+      .workout-nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        line-height: 1;
+        z-index: 2;
+        transition: background 120ms ease, transform 120ms ease, opacity 120ms ease;
+      }
+      .workout-nav-btn:hover {
+        background: rgba(0, 0, 0, 0.62);
+      }
+      .workout-nav-btn:active {
+        transform: translateY(-50%) scale(0.96);
+      }
+      .workout-nav-btn.left {
+        left: 12px;
+      }
+      .workout-nav-btn.right {
+        right: 12px;
+      }
+      .workout-nav-btn ha-icon {
+        --mdc-icon-size: 28px;
       }
       .thumb {
         width: 100%;
-        height: 100%;
-        object-fit: cover;
+        height: auto;
+        object-fit: contain;
         display: block;
       }
       .placeholder {
         width: 100%;
-        height: 100%;
+        min-height: 220px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -205,7 +271,20 @@ class HalthyWorkoutCard extends HTMLElement {
         color: rgba(0, 0, 0, 0.35);
       }
       .meta {
-        padding: 10px 0 0;
+        padding: 10px 16px 0;
+      }
+      .headline-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .headline-main {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+        min-width: 0;
       }
       .name {
         font-weight: 600;
@@ -215,16 +294,9 @@ class HalthyWorkoutCard extends HTMLElement {
         color: var(--secondary-text-color);
         font-size: 0.9rem;
       }
-      .date-row {
-        margin-top: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
       .calendar-inline-btn {
-        border: 1px solid var(--divider-color);
-        background: var(--card-background-color, #fff);
+        border: none;
+        background: transparent;
         border-radius: 8px;
         width: 30px;
         height: 30px;
@@ -236,13 +308,14 @@ class HalthyWorkoutCard extends HTMLElement {
         justify-content: center;
         color: var(--primary-text-color);
         cursor: pointer;
+        align-self: flex-start;
       }
       .calendar-inline-btn[disabled] {
         opacity: 0.5;
         cursor: not-allowed;
       }
       .calendar-inline-icon {
-        --mdc-icon-size: 18px;
+        --mdc-icon-size: 29px;
       }
       .chips {
         margin-top: 8px;
@@ -281,21 +354,28 @@ class HalthyWorkoutCard extends HTMLElement {
         z-index: 1000;
       }
       .modal {
-        width: min(700px, 100%);
-        max-height: 90vh;
+        width: min(900px, 100%);
+        max-height: 94vh;
         overflow: auto;
-        border-radius: 14px;
+        border-radius: 18px;
         border: 1px solid var(--divider-color);
         background: var(--card-background-color, #fff);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       }
-      .modal-header {
+      .calendar-panel {
+        margin: 4px 12px 12px;
+        padding: 12px 0 0;
+        border: 1px solid var(--divider-color);
+        border-radius: 16px;
+        background: rgba(127, 127, 127, 0.08);
+        overflow: hidden;
+      }
+      .calendar-nav {
         display: grid;
-        grid-template-columns: auto 1fr auto auto;
+        grid-template-columns: auto 1fr auto;
         align-items: center;
         gap: 8px;
-        padding: 12px;
-        border-bottom: 1px solid var(--divider-color);
+        padding: 0 12px;
       }
       .month-label {
         font-weight: 600;
@@ -339,40 +419,114 @@ class HalthyWorkoutCard extends HTMLElement {
         cursor: pointer;
         font: inherit;
       }
+      .day-label {
+        display: block;
+        line-height: 1;
+      }
       .day.blank {
         visibility: hidden;
         pointer-events: none;
       }
       .day.has-workout {
         border-color: var(--primary-color);
-        background: rgba(33, 150, 243, 0.1);
-        font-weight: 600;
+        background: var(--primary-color);
+        color: var(--text-primary-color, #fff);
+        font-weight: 700;
+      }
+      .day-markers {
+        position: absolute;
+        left: 50%;
+        bottom: 4px;
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-width: 14px;
+        min-height: 6px;
       }
       .day.selected {
-        outline: 2px solid var(--primary-color);
-        outline-offset: 1px;
+        outline: 2px solid var(--card-background-color, #fff);
+        outline-offset: -3px;
+        box-shadow: 0 0 0 2px var(--primary-color);
       }
-      .count {
-        position: absolute;
-        top: 2px;
-        right: 4px;
-        font-size: 0.65rem;
-        color: var(--secondary-text-color);
+      .marker-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 999px;
+        background: currentColor;
+        opacity: 0.95;
       }
       .selected-wrap {
-        padding: 0 12px 12px;
+        padding: 12px 12px 10px;
       }
-      .selected-note {
-        margin-bottom: 8px;
-        font-size: 0.85rem;
+      .selected-card .thumb-wrap {
+        border-radius: 16px;
+      }
+      .workout-strip {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 10px 0 2px;
+        scrollbar-width: thin;
+      }
+      .workout-tab {
+        border: 1px solid var(--divider-color);
+        border-radius: 8px;
+        background: var(--card-background-color, #fff);
+        color: var(--primary-text-color);
+        min-width: 132px;
+        max-width: 160px;
+        padding: 0;
+        overflow: hidden;
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+      }
+      .workout-tab.selected {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 1px var(--primary-color);
+      }
+      .workout-tab-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: rgba(127, 127, 127, 0.14);
+        overflow: hidden;
+      }
+      .workout-tab-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .workout-tab-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: var(--secondary-text-color);
+        font-size: 0.75rem;
+      }
+      .workout-tab-meta {
+        padding: 6px 8px 7px;
+        display: grid;
+        gap: 2px;
+      }
+      .workout-tab-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .workout-tab-time {
+        color: var(--secondary-text-color);
+        font-size: 0.74rem;
       }
       @media (max-width: 520px) {
-        .modal-header {
+        .calendar-nav {
           grid-template-columns: auto 1fr auto;
-        }
-        .close-btn {
-          grid-column: 3;
         }
       }
     `;
@@ -388,29 +542,19 @@ class HalthyWorkoutCard extends HTMLElement {
       return;
     }
 
-    this._revokeImageObjectUrls();
-
     const renderedTitle = typeof this._config.title === "string" ? this._config.title.trim() : "";
     this._title.textContent = renderedTitle;
     this._title.style.display = renderedTitle ? "block" : "none";
 
     const entityId = this._resolvedEntityId();
     const stateObj = entityId ? this._hass.states[entityId] : null;
-    if (!stateObj) {
-      this._content.innerHTML = `<div class="state">Entity not found: ${this._escape(
-        entityId || "image.<halthy_user>_workout"
-      )}</div>`;
-      return;
-    }
 
     this._ensureMediaArchiveLoaded(stateObj);
 
-    const attributeWorkouts = this._extractWorkouts(stateObj);
-    const workouts =
-      this._config.use_media_archive && this._mediaWorkouts.length
-        ? this._mediaWorkouts
-        : attributeWorkouts;
+    const attributeWorkouts = stateObj ? this._extractWorkouts(stateObj) : [];
+    const workouts = this._resolvedWorkouts(attributeWorkouts);
     const workoutsByDay = this._buildWorkoutsByDay(workouts);
+    const currentIndex = this._clampedMainWorkoutIndex(workouts);
 
     if (workouts.length && !this._calendarMonth) {
       const latestWithTime = workouts.find((workout) => workout.timestamp !== null);
@@ -425,19 +569,27 @@ class HalthyWorkoutCard extends HTMLElement {
       this._selectedDayKey = workouts[0].dayKey || "";
     }
 
-    const latest = workouts[0] || null;
-    const latestHtml = latest
-      ? this._renderWorkoutCard(latest, "latest-card-click", {
+    const currentWorkout = workouts[currentIndex] || null;
+    const latestHtml = currentWorkout
+      ? this._renderWorkoutCard(currentWorkout, "latest-card-click", {
           showCalendarButton: true,
           calendarDisabled: !workouts.length,
+          showWorkoutNavigation: workouts.length > 1,
+          hasPreviousWorkout: currentIndex < workouts.length - 1,
+          hasNextWorkout: currentIndex > 0,
         })
       : `<div class="state">${this._escape(this._config.empty_message)}</div>`;
 
     this._content.innerHTML = `
       ${latestHtml}
       ${
-        this._config.use_media_archive && this._mediaLoading
-          ? `<div class="state">Loading archived workouts from media folder...</div>`
+        !stateObj && !this._config.use_media_archive
+          ? `<div class="state">Entity not found: ${this._escape(entityId || "image.<halthy_user>_workout")}</div>`
+          : ""
+      }
+      ${
+        this._config.use_media_archive && (this._mediaLoading || this._apiLoading)
+          ? `<div class="state">Loading archived workouts...</div>`
           : ""
       }
       ${this._calendarOpen ? this._renderCalendarModal(workoutsByDay) : ""}
@@ -450,18 +602,31 @@ class HalthyWorkoutCard extends HTMLElement {
         if (!workouts.length) {
           return;
         }
+        if (currentWorkout?.dayKey) {
+          this._selectedDayKey = currentWorkout.dayKey;
+          this._selectedWorkoutIndex = this._indexWithinDay(workoutsByDay, currentWorkout);
+        }
         this._calendarOpen = true;
         this._render();
       });
     });
 
-    const closeBtn = this._content.querySelector('[data-action="close-calendar"]');
-    if (closeBtn) {
-      closeBtn.addEventListener("click", () => {
-        this._calendarOpen = false;
-        this._render();
+    this._content.querySelectorAll('[data-action="navigate-workout"]').forEach((navBtn) => {
+      navBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const direction = navBtn.getAttribute("data-direction") || "";
+        if (direction === "previous" && this._currentWorkoutIndex < workouts.length - 1) {
+          this._currentWorkoutIndex += 1;
+          this._render();
+          return;
+        }
+        if (direction === "next" && this._currentWorkoutIndex > 0) {
+          this._currentWorkoutIndex -= 1;
+          this._render();
+        }
       });
-    }
+    });
 
     const backdrop = this._content.querySelector(".modal-backdrop");
     if (backdrop) {
@@ -496,6 +661,18 @@ class HalthyWorkoutCard extends HTMLElement {
           return;
         }
         this._selectedDayKey = dayKey;
+        this._selectedWorkoutIndex = 0;
+        this._render();
+      });
+    });
+
+    this._content.querySelectorAll("[data-workout-index]").forEach((workoutBtn) => {
+      workoutBtn.addEventListener("click", () => {
+        const rawIndex = Number(workoutBtn.getAttribute("data-workout-index"));
+        if (!Number.isInteger(rawIndex) || rawIndex < 0) {
+          return;
+        }
+        this._selectedWorkoutIndex = rawIndex;
         this._render();
       });
     });
@@ -506,7 +683,15 @@ class HalthyWorkoutCard extends HTMLElement {
         if (event.target && typeof event.target.closest === "function" && event.target.closest("[data-action]")) {
           return;
         }
-        this._fire("hass-more-info", { entityId });
+        if (!workouts.length) {
+          return;
+        }
+        if (currentWorkout?.dayKey) {
+          this._selectedDayKey = currentWorkout.dayKey;
+          this._selectedWorkoutIndex = this._indexWithinDay(workoutsByDay, currentWorkout);
+        }
+        this._calendarOpen = true;
+        this._render();
       });
     }
   }
@@ -573,9 +758,18 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _normalizeWorkout(item, stateObj) {
-    const title = this._firstString(
-      item.title,
-      item.name,
+    const title = this._betterWorkoutTitle(
+      this._firstString(item.title, item.name),
+      this._firstString(
+        item.workout_type,
+        item.workout_activity_type,
+        item.activity_type,
+        item.type
+      )
+    );
+
+    const resolvedTitle = this._firstString(
+      title,
       item.workout_type,
       item.workout_activity_type,
       item.activity_type,
@@ -614,13 +808,14 @@ class HalthyWorkoutCard extends HTMLElement {
     );
 
     return {
-      title,
+      title: resolvedTitle,
       timestamp,
       dayKey: timestamp ? this._dayKey(timestamp) : "",
       dateLabel: timestamp ? this._formatDate(timestamp) : this._formatDate(dateSource),
       image,
       chips: this._chipsFromWorkout(item),
       entity_id: stateObj.entity_id,
+      archiveKey: this._archiveKeyFromWorkoutItem(item, image),
     };
   }
 
@@ -663,6 +858,7 @@ class HalthyWorkoutCard extends HTMLElement {
       image,
       chips: this._chipsFromWorkout(attrs),
       entity_id: stateObj.entity_id,
+      archiveKey: this._archiveKeyFromWorkoutItem(attrs, image),
     };
   }
 
@@ -672,6 +868,93 @@ class HalthyWorkoutCard extends HTMLElement {
       const bTime = b.timestamp ? b.timestamp.getTime() : 0;
       return bTime - aTime;
     });
+  }
+
+  _resolvedWorkouts(attributeWorkouts) {
+    const attributeList = Array.isArray(attributeWorkouts) ? attributeWorkouts : [];
+    if (!this._config.use_media_archive) {
+      return this._sortWorkouts([...attributeList]);
+    }
+
+    const merged = [...this._apiArchiveWorkouts, ...this._mediaWorkouts, ...attributeList];
+    if (!merged.length) {
+      return [];
+    }
+
+    const deduped = new Map();
+    for (const workout of merged) {
+      const key = this._workoutDedupKey(workout);
+      const existing = deduped.get(key);
+      deduped.set(key, existing ? this._mergeWorkoutRecords(existing, workout) : workout);
+    }
+    return this._sortWorkouts([...deduped.values()]);
+  }
+
+  _workoutDedupKey(workout) {
+    if (!workout || typeof workout !== "object") {
+      return String(workout);
+    }
+    const timestampIso =
+      workout.timestamp instanceof Date && !Number.isNaN(workout.timestamp.getTime())
+        ? workout.timestamp.toISOString()
+        : "";
+    if (timestampIso) {
+      return `time:${this._firstString(workout.dayKey)}:${timestampIso}`;
+    }
+
+    const archiveKey = this._normalizeArchiveKey(
+      this._firstString(
+        workout.archiveKey,
+        this._relativePathFromLocalUrl(workout.image),
+        this._relativePathFromMediaSourceId(workout.image),
+        this._relativePathFromWorkoutImageApiUrl(workout.image)
+      )
+    );
+    if (archiveKey) {
+      return `archive:${archiveKey}`;
+    }
+
+    return [
+      "fallback",
+      this._firstString(workout.dayKey),
+      this._firstString(workout.image),
+      this._firstString(workout.title),
+    ].join(":");
+  }
+
+  _mergeWorkoutRecords(existing, incoming) {
+    const title = this._betterWorkoutTitle(existing.title, incoming.title);
+    const timestamp = existing.timestamp || incoming.timestamp || null;
+    const dayKey = this._firstString(existing.dayKey, incoming.dayKey);
+    return {
+      ...existing,
+      ...incoming,
+      title,
+      timestamp,
+      dayKey,
+      dateLabel: this._firstString(existing.dateLabel, incoming.dateLabel),
+      image: this._firstString(existing.image, incoming.image),
+      chips: Array.isArray(existing.chips) && existing.chips.length ? existing.chips : incoming.chips || [],
+      entity_id: this._firstString(existing.entity_id, incoming.entity_id),
+      archiveKey: this._firstString(existing.archiveKey, incoming.archiveKey),
+    };
+  }
+
+  _betterWorkoutTitle(existingTitle, incomingTitle) {
+    const existing = this._firstString(existingTitle);
+    const incoming = this._firstString(incomingTitle);
+    if (this._isGenericWorkoutTitle(existing) && !this._isGenericWorkoutTitle(incoming)) {
+      return incoming;
+    }
+    if (!this._isGenericWorkoutTitle(existing)) {
+      return existing;
+    }
+    return incoming || existing || "Workout";
+  }
+
+  _isGenericWorkoutTitle(title) {
+    const normalized = this._firstString(title).trim().toLowerCase();
+    return !normalized || normalized === "workout";
   }
 
   _buildWorkoutsByDay(workouts) {
@@ -688,12 +971,68 @@ class HalthyWorkoutCard extends HTMLElement {
     return map;
   }
 
+  _clampedMainWorkoutIndex(workouts) {
+    const count = Array.isArray(workouts) ? workouts.length : 0;
+    if (count <= 0) {
+      this._currentWorkoutIndex = 0;
+      return 0;
+    }
+    if (!Number.isInteger(this._currentWorkoutIndex) || this._currentWorkoutIndex < 0) {
+      this._currentWorkoutIndex = 0;
+      return 0;
+    }
+    if (this._currentWorkoutIndex >= count) {
+      this._currentWorkoutIndex = count - 1;
+    }
+    return this._currentWorkoutIndex;
+  }
+
+  _indexWithinDay(workoutsByDay, workout) {
+    if (!workout?.dayKey || !workoutsByDay || typeof workoutsByDay.get !== "function") {
+      return 0;
+    }
+    const dayWorkouts = workoutsByDay.get(workout.dayKey) || [];
+    const index = dayWorkouts.indexOf(workout);
+    return index >= 0 ? index : 0;
+  }
+
   _renderWorkoutCard(workout, extraClass = "", options = {}) {
     const imageHtml = workout.image
       ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(
           workout.title || "Workout"
         )}" />`
       : `<div class="placeholder">WK</div>`;
+    const showWorkoutNavigation = options.showWorkoutNavigation === true;
+    const navHtml = showWorkoutNavigation
+      ? `
+        ${
+          options.hasPreviousWorkout
+            ? `<button
+                class="workout-nav-btn left"
+                data-action="navigate-workout"
+                data-direction="previous"
+                aria-label="Show previous workout"
+                title="Show previous workout"
+              >
+                <ha-icon icon="mdi:chevron-left"></ha-icon>
+              </button>`
+            : ""
+        }
+        ${
+          options.hasNextWorkout
+            ? `<button
+                class="workout-nav-btn right"
+                data-action="navigate-workout"
+                data-direction="next"
+                aria-label="Show newer workout"
+                title="Show newer workout"
+              >
+                <ha-icon icon="mdi:chevron-right"></ha-icon>
+              </button>`
+            : ""
+        }
+      `
+      : "";
 
     const chips = workout.chips
       .map((chip) => `<span class="chip">${this._escape(chip)}</span>`)
@@ -711,19 +1050,21 @@ class HalthyWorkoutCard extends HTMLElement {
           <ha-icon class="calendar-inline-icon" icon="${this._escapeAttr(this._calendarIcon())}"></ha-icon>
         </button>`
       : "";
-    const dateRowHtml = workout.dateLabel || calendarButtonHtml
-      ? `<div class="date-row">
-          ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : "<div></div>"}
-          ${calendarButtonHtml}
-        </div>`
-      : "";
+    const headlineHtml = `
+      <div class="headline-row">
+        <div class="headline-main">
+          <div class="name">${this._escape(workout.title || "Workout")}</div>
+          ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : ""}
+        </div>
+        ${calendarButtonHtml}
+      </div>
+    `;
 
     return `
       <article class="workout-card ${this._escapeAttr(extraClass)}">
-        <div class="thumb-wrap">${imageHtml}</div>
+        <div class="thumb-wrap">${imageHtml}${navHtml}</div>
         <div class="meta">
-          <div class="name">${this._escape(workout.title || "Workout")}</div>
-          ${dateRowHtml}
+          ${headlineHtml}
           ${chips ? `<div class="chips">${chips}</div>` : ""}
         </div>
       </article>
@@ -741,30 +1082,32 @@ class HalthyWorkoutCard extends HTMLElement {
 
     const calendarGrid = this._renderCalendarGrid(workoutsByDay);
     const selectedWorkouts = this._selectedDayKey ? workoutsByDay.get(this._selectedDayKey) || [] : [];
-    const selectedWorkout = selectedWorkouts[0] || null;
+    const selectedIndex = this._clampedWorkoutIndex(selectedWorkouts);
+    const selectedWorkout = selectedWorkouts[selectedIndex] || null;
     const selectedMessage = this._config.calendar_empty_day_message;
+    const selectorHtml =
+      selectedWorkouts.length > 1 ? this._renderWorkoutSelector(selectedWorkouts, selectedIndex) : "";
 
     const selectedHtml = selectedWorkout
       ? `
-        <div class="selected-note">${selectedWorkouts.length} workout${
-          selectedWorkouts.length === 1 ? "" : "s"
-        } on this day</div>
         ${this._renderWorkoutCard(selectedWorkout, "selected-card")}
+        ${selectorHtml}
       `
       : `<div class="state">${this._escape(selectedMessage)}</div>`;
 
     return `
       <div class="modal-backdrop">
         <div class="modal" role="dialog" aria-modal="true" aria-label="Workout Calendar">
-          <div class="modal-header">
-            <button class="icon-btn" data-action="prev-month" aria-label="Previous month">&#8249;</button>
-            <div class="month-label">${this._escape(monthLabel)}</div>
-            <button class="icon-btn" data-action="next-month" aria-label="Next month">&#8250;</button>
-            <button class="icon-btn close-btn" data-action="close-calendar" aria-label="Close">X</button>
-          </div>
-          <div class="weekdays">${weekdayHtml}</div>
-          <div class="days-grid">${calendarGrid}</div>
           <div class="selected-wrap">${selectedHtml}</div>
+          <div class="calendar-panel">
+            <div class="calendar-nav">
+              <button class="icon-btn" data-action="prev-month" aria-label="Previous month">&#8249;</button>
+              <div class="month-label">${this._escape(monthLabel)}</div>
+              <button class="icon-btn" data-action="next-month" aria-label="Next month">&#8250;</button>
+            </div>
+            <div class="weekdays">${weekdayHtml}</div>
+            <div class="days-grid">${calendarGrid}</div>
+          </div>
         </div>
       </div>
     `;
@@ -796,8 +1139,8 @@ class HalthyWorkoutCard extends HTMLElement {
           ${hasWorkout ? `data-day-key="${dayKey}"` : "disabled"}
           aria-label="${dayKey}"
         >
-          ${day}
-          ${count > 1 ? `<span class="count">${count}</span>` : ""}
+          <span class="day-label">${day}</span>
+          ${this._renderDayMarkers(count)}
         </button>
       `);
     }
@@ -807,6 +1150,60 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     return cells.join("");
+  }
+
+  _renderDayMarkers(count) {
+    if (!Number.isFinite(count) || count <= 0) {
+      return "";
+    }
+    const dots = Array.from({ length: Math.min(count, 4) }, () => '<span class="marker-dot"></span>').join("");
+    return `<span class="day-markers">${dots}</span>`;
+  }
+
+  _renderWorkoutSelector(workouts, selectedIndex) {
+    return `
+      <div class="workout-strip" role="list" aria-label="Workouts on selected day">
+        ${workouts
+          .map((workout, index) => this._renderWorkoutSelectorItem(workout, index, index === selectedIndex))
+          .join("")}
+      </div>
+    `;
+  }
+
+  _renderWorkoutSelectorItem(workout, index, selected) {
+    const imageHtml = workout.image
+      ? `<img src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(workout.title || "Workout")}" loading="lazy" />`
+      : `<div class="workout-tab-placeholder">No image</div>`;
+    const timeLabel = this._formatTime(workout.timestamp) || workout.dateLabel || "";
+    return `
+      <button
+        class="workout-tab ${selected ? "selected" : ""}"
+        data-workout-index="${index}"
+        aria-label="${this._escapeAttr(workout.title || "Workout")}${timeLabel ? ` ${this._escapeAttr(timeLabel)}` : ""}"
+        ${selected ? 'aria-current="true"' : ""}
+      >
+        <div class="workout-tab-thumb">${imageHtml}</div>
+        <div class="workout-tab-meta">
+          <div class="workout-tab-title">${this._escape(workout.title || "Workout")}</div>
+          ${timeLabel ? `<div class="workout-tab-time">${this._escape(timeLabel)}</div>` : ""}
+        </div>
+      </button>
+    `;
+  }
+
+  _clampedWorkoutIndex(workouts) {
+    const count = Array.isArray(workouts) ? workouts.length : 0;
+    if (count <= 0) {
+      return 0;
+    }
+    if (!Number.isInteger(this._selectedWorkoutIndex) || this._selectedWorkoutIndex < 0) {
+      this._selectedWorkoutIndex = 0;
+      return 0;
+    }
+    if (this._selectedWorkoutIndex >= count) {
+      this._selectedWorkoutIndex = count - 1;
+    }
+    return this._selectedWorkoutIndex;
   }
 
   _chipsFromWorkout(item) {
@@ -836,22 +1233,75 @@ class HalthyWorkoutCard extends HTMLElement {
       chips.push(`${Math.round(hr)} bpm`);
     }
 
+    const heartRateZone = this._dominantZoneChip(item.heart_rate_zones, "HR");
+    if (heartRateZone) {
+      chips.push(heartRateZone);
+    }
+
+    const powerZone = this._dominantZoneChip(item.cycling_power_zones, "Power");
+    if (powerZone) {
+      chips.push(powerZone);
+    }
+
     return chips;
   }
 
+  _dominantZoneChip(zones, label) {
+    if (!Array.isArray(zones) || !zones.length) {
+      return "";
+    }
+
+    let bestZone = null;
+    let bestDuration = 0;
+    for (const zone of zones) {
+      if (!zone || typeof zone !== "object") {
+        continue;
+      }
+      const duration = this._toNumber(zone.duration_s);
+      if (duration !== null && duration > bestDuration) {
+        bestDuration = duration;
+        bestZone = zone;
+      }
+    }
+
+    if (!bestZone || bestDuration <= 0) {
+      return "";
+    }
+
+    const zoneNumber = this._toNumber(bestZone.zone);
+    const zoneLabel = zoneNumber !== null ? `Z${Math.round(zoneNumber)}` : "Zone";
+    return `${label} ${zoneLabel} ${this._formatShortDuration(bestDuration)}`;
+  }
+
+  _formatShortDuration(seconds) {
+    const minutes = Math.max(1, Math.round(seconds / 60));
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
+  }
+
   _ensureMediaArchiveLoaded(stateObj) {
-    if (!this._config.use_media_archive || !this._hass || typeof this._hass.callWS !== "function") {
+    if (!this._config.use_media_archive || !this._hass) {
       return;
     }
 
-    const attrs = stateObj.attributes || {};
-    const folder = this._detectArchiveFolder(attrs);
-    if (!folder) {
+    const attrs = stateObj?.attributes || {};
+    this._ensureArchiveApiLoaded(stateObj, attrs);
+    if (typeof this._hass.callWS !== "function") {
+      return;
+    }
+
+    const folders = this._archiveFolderCandidates(attrs);
+    if (!folders.length) {
       return;
     }
 
     const archiveFileName = this._firstString(attrs.archive_file_name);
-    const folderChanged = folder !== this._mediaArchiveFolder;
+    const foldersKey = folders.join("|");
+    const folderChanged = foldersKey !== this._mediaArchiveFoldersKey;
     const hasNewLatestFile = !!archiveFileName && archiveFileName !== this._lastArchiveFileName;
 
     if (archiveFileName) {
@@ -866,29 +1316,265 @@ class HalthyWorkoutCard extends HTMLElement {
       return;
     }
 
-    this._mediaArchiveFolder = folder;
-    void this._loadMediaArchiveWorkouts(folder, stateObj.entity_id);
+    this._mediaArchiveFoldersKey = foldersKey;
+    const resolvedEntityId = stateObj?.entity_id || this._resolvedEntityId() || _entityFromUser(this._config?.user || "");
+    void this._loadMediaArchiveWorkouts(folders, resolvedEntityId);
   }
 
-  async _loadMediaArchiveWorkouts(folder, entityId) {
+  _defaultArchiveFolderForUser() {
+    const userFromConfig = _sanitizeIdentifier(this._config?.user || "");
+    const userFromEntity = _userFromWorkoutEntity(this._resolvedEntityId());
+    const user = userFromConfig || userFromEntity;
+    if (!user) {
+      return "";
+    }
+    return `halthy/workouts/${user}`;
+  }
+
+  _ensureArchiveApiLoaded(stateObj, attrs = {}) {
+    if (!this._config.use_media_archive) {
+      return;
+    }
+
+    const resolvedEntityId = stateObj?.entity_id || this._resolvedEntityId() || _entityFromUser(this._config?.user || "");
+    const user = this._firstString(
+      _sanitizeIdentifier(this._config?.user || ""),
+      _userFromWorkoutEntity(resolvedEntityId),
+      _sanitizeIdentifier(this._firstString(attrs.username))
+    );
+    if (!user) {
+      return;
+    }
+
+    const archiveFileName = this._firstString(attrs.archive_file_name);
+    const hasNewLatestFile = !!archiveFileName && archiveFileName !== this._lastArchiveFileName;
+    if (archiveFileName) {
+      this._lastArchiveFileName = archiveFileName;
+    }
+    const userChanged = user !== this._apiArchiveUser;
+    if (!userChanged && !hasNewLatestFile && (this._apiLoading || this._apiWorkoutsLoaded)) {
+      return;
+    }
+
+    this._apiArchiveUser = user;
+    void this._loadArchiveApiWorkouts(user, resolvedEntityId);
+  }
+
+  async _loadArchiveApiWorkouts(user, entityId) {
+    const loadSeq = ++this._apiLoadSeq;
+    this._apiLoading = true;
+    this._apiWorkoutsLoaded = false;
+    this._render();
+
+    try {
+      const endpoint = `/api/halthy/workouts?username=${encodeURIComponent(user)}&limit=300`;
+      const payload = await this._fetchAuthedJson(endpoint);
+      const records = Array.isArray(payload?.workouts) ? payload.workouts : [];
+      const workouts = (
+        await Promise.all(records.map((record) => this._workoutFromArchiveApiItemAsync(record, entityId)))
+      ).filter((item) => item !== null);
+
+      this._sortWorkouts(workouts);
+      if (loadSeq !== this._apiLoadSeq) {
+        return;
+      }
+      this._apiArchiveWorkouts = workouts;
+    } catch (_error) {
+      if (loadSeq !== this._apiLoadSeq) {
+        return;
+      }
+      this._apiArchiveWorkouts = [];
+    } finally {
+      if (loadSeq !== this._apiLoadSeq) {
+        return;
+      }
+      this._apiLoading = false;
+      this._apiWorkoutsLoaded = true;
+      this._render();
+    }
+  }
+
+  async _fetchAuthedJson(url) {
+    if (this._hass && typeof this._hass.callApi === "function") {
+      const normalizedPath = typeof url === "string" ? url.trim() : "";
+      if (normalizedPath.startsWith("/api/")) {
+        const apiPath = normalizedPath.slice(5);
+        if (apiPath) {
+          try {
+            return await this._hass.callApi("get", apiPath);
+          } catch (_error) {
+            // Fall through to fetch-based fallback below.
+          }
+        }
+      }
+    }
+
+    const absoluteUrl = this._sameOriginAbsoluteUrl(url);
+    if (!absoluteUrl || typeof fetch !== "function") {
+      return null;
+    }
+
+    const token = this._frontendAuthToken();
+    const optionsWithAuth = {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/json" } : { Accept: "application/json" },
+      credentials: "same-origin",
+    };
+
+    let response;
+    try {
+      response = await fetch(absoluteUrl.toString(), optionsWithAuth);
+      if (!response.ok && token) {
+        response = await fetch(absoluteUrl.toString(), {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
+      }
+    } catch (_error) {
+      return null;
+    }
+
+    if (!response || !response.ok) {
+      return null;
+    }
+    try {
+      return await response.json();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async _workoutFromArchiveApiItemAsync(record, entityId) {
+    if (!record || typeof record !== "object") {
+      return null;
+    }
+
+    const relativePath = this._firstString(record.relative_path);
+    const fileName = this._firstString(record.file_name, relativePath ? relativePath.split("/").pop() || "" : "");
+    const dateInfoFromName = this._archiveDateInfoFromFileName(fileName);
+    const timestamp = this._toDate(this._firstString(record.timestamp)) || dateInfoFromName?.timestamp;
+    const dayKey =
+      this._firstString(record.day_key) || dateInfoFromName?.dayKey || (timestamp ? this._dayKey(timestamp) : "");
+    const dateLabel = timestamp ? this._formatDate(timestamp) : "";
+
+    const imageApiUrl = this._firstString(record.image_url);
+    const localUrlFromRecord = this._firstString(record.local_url);
+    const fallbackLocalUrl = relativePath
+      ? `/media/local/${relativePath
+          .split("/")
+          .filter((segment) => segment.length > 0)
+          .map((segment) => encodeURIComponent(segment))
+          .join("/")}`
+      : "";
+    const mediaSourceId = this._firstString(record.media_source_id);
+    const resolvedImage = imageApiUrl
+      ? this._normalizeImageUrl(imageApiUrl)
+      : await this._authSafeImageUrl(
+          this._normalizeImageUrl(this._firstString(localUrlFromRecord, fallbackLocalUrl, mediaSourceId))
+        );
+    if (!resolvedImage && !dayKey && !timestamp) {
+      return null;
+    }
+
+    return {
+      title: this._firstString(
+        record.workout_type,
+        record.workout_activity_type,
+        record.activity_type,
+        record.workout_kind,
+        record.type,
+        record.title,
+        record.name,
+        "Workout"
+      ),
+      timestamp,
+      dayKey,
+      dateLabel,
+      image: resolvedImage,
+      chips: this._chipsFromWorkout(record),
+      entity_id: entityId,
+      archiveKey: relativePath,
+    };
+  }
+
+  _archiveFolderCandidates(attrs = {}) {
+    const unique = new Set();
+    const folders = [];
+
+    const addFolder = (candidate) => {
+      if (typeof candidate !== "string") {
+        return;
+      }
+      const normalized = candidate.replace(/^\/+/, "").replace(/\/+$/, "").trim();
+      if (!normalized || unique.has(normalized)) {
+        return;
+      }
+      unique.add(normalized);
+      folders.push(normalized);
+    };
+
+    const detectedFolder = this._detectArchiveFolder(attrs);
+    if (detectedFolder) {
+      addFolder(detectedFolder);
+    }
+
+    const defaultFolder = this._defaultArchiveFolderForUser();
+    if (defaultFolder) {
+      addFolder(defaultFolder);
+    }
+
+    const userCandidates = [
+      _sanitizeIdentifier(this._config?.user || ""),
+      _userFromWorkoutEntity(this._resolvedEntityId()),
+      _sanitizeIdentifier(this._firstString(attrs.username)),
+    ].filter((item) => !!item);
+
+    const domainCandidates = ["halthy", "halthy_bridge", "health2ha", "health2ha_bridge"];
+    for (const user of userCandidates) {
+      for (const domain of domainCandidates) {
+        addFolder(`${domain}/workouts/${user}`);
+      }
+    }
+
+    return folders;
+  }
+
+  async _loadMediaArchiveWorkouts(folderOrFolders, entityId) {
     const loadSeq = ++this._mediaLoadSeq;
     this._mediaLoading = true;
     this._mediaWorkoutsLoaded = false;
     this._render();
 
     try {
-      const mediaContentId = `media-source://media_source/local/${folder}`;
-      const response = await this._hass.callWS({
-        type: "media_source/browse_media",
-        media_content_id: mediaContentId,
-      });
+      const folderCandidates = Array.isArray(folderOrFolders)
+        ? folderOrFolders.filter((folder) => typeof folder === "string" && folder.trim())
+        : [folderOrFolders].filter((folder) => typeof folder === "string" && folder.trim());
 
-      const children = Array.isArray(response?.children) ? response.children : [];
+      const imageChildren = [];
+      const seenChildren = new Set();
+      for (const folder of folderCandidates) {
+        const mediaContentId = `media-source://media_source/local/${folder}`;
+        const children = await this._collectImageMediaChildren(mediaContentId);
+        for (const child of children) {
+          const childKey = this._firstString(
+            child?.media_content_id,
+            child?.url,
+            child?.thumbnail,
+            child?.title
+          );
+          const normalizedKey = childKey || JSON.stringify(child || {});
+          if (seenChildren.has(normalizedKey)) {
+            continue;
+          }
+          seenChildren.add(normalizedKey);
+          imageChildren.push(child);
+        }
+      }
+
       const workouts = (
         await Promise.all(
-          children
-            .filter((child) => this._isImageMediaChild(child))
-            .map((child) => this._workoutFromMediaChildAsync(child, entityId))
+          imageChildren.map((child) => this._workoutFromMediaChildAsync(child, entityId))
         )
       ).filter((item) => item !== null);
 
@@ -910,6 +1596,51 @@ class HalthyWorkoutCard extends HTMLElement {
       this._mediaWorkoutsLoaded = true;
       this._render();
     }
+  }
+
+  async _collectImageMediaChildren(mediaContentId, depth = 0, visited = new Set()) {
+    if (!mediaContentId || typeof mediaContentId !== "string") {
+      return [];
+    }
+    if (visited.has(mediaContentId)) {
+      return [];
+    }
+    visited.add(mediaContentId);
+
+    let response;
+    try {
+      response = await this._hass.callWS({
+        type: "media_source/browse_media",
+        media_content_id: mediaContentId,
+      });
+    } catch (_error) {
+      return [];
+    }
+
+    const children = Array.isArray(response?.children) ? response.children : [];
+    const images = [];
+    for (const child of children) {
+      const isImageChild = this._isImageMediaChild(child);
+      if (isImageChild) {
+        images.push(child);
+      }
+
+      const childMediaContentId = this._firstString(child?.media_content_id);
+      const canExpand =
+        child &&
+        typeof child === "object" &&
+        !isImageChild &&
+        child.can_expand !== false;
+      if (!canExpand || !childMediaContentId || depth >= 6) {
+        continue;
+      }
+      const nested = await this._collectImageMediaChildren(childMediaContentId, depth + 1, visited);
+      if (nested.length) {
+        images.push(...nested);
+      }
+    }
+
+    return images;
   }
 
   _detectArchiveFolder(attrs) {
@@ -943,27 +1674,33 @@ class HalthyWorkoutCard extends HTMLElement {
     if (typeof child.media_content_type === "string" && child.media_content_type.startsWith("image/")) {
       return true;
     }
-    const title = this._firstString(child.title);
-    return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(title);
+    const candidate = this._firstString(child.title, child.media_content_id, child.url, child.thumbnail);
+    return /\.(png|jpe?g|webp|gif|bmp|svg|tiff?|heic|heif|avif)(\?|$)/i.test(candidate);
   }
 
   async _workoutFromMediaChildAsync(child, entityId) {
     const mediaSourceId = this._firstString(child.media_content_id);
-    const relativePath = this._relativePathFromMediaSourceId(mediaSourceId);
-    if (!relativePath) {
-      return null;
-    }
-
-    const fileName = relativePath.split("/").pop() || "";
+    const relativePathFromMediaSource = this._relativePathFromMediaSourceId(mediaSourceId);
+    const relativePathFromUrl = this._relativePathFromLocalUrl(this._firstString(child.url, child.thumbnail));
+    const relativePath = relativePathFromMediaSource || relativePathFromUrl;
+    const fileName = relativePath
+      ? relativePath.split("/").pop() || ""
+      : this._firstString(child.title, mediaSourceId, child.url, child.thumbnail);
+    const fileNameDateInfo =
+      this._archiveDateInfoFromFileName(fileName) ||
+      this._archiveDateInfoFromFileName(this._firstString(child.title));
     const timestamp =
-      this._archiveTimestampFromFileName(fileName) ||
+      fileNameDateInfo?.timestamp ||
       this._toDate(child.modified_at) ||
       this._toDate(child.created_at);
 
     const dateLabel = timestamp ? this._formatDate(timestamp) : "";
-    const dayKey = timestamp ? this._dayKey(timestamp) : "";
+    const dayKey = fileNameDateInfo?.dayKey || (timestamp ? this._dayKey(timestamp) : "");
 
     const resolvedImage = await this._resolvedMediaImageUrl(child, mediaSourceId, relativePath);
+    if (!resolvedImage && !dayKey && !timestamp) {
+      return null;
+    }
 
     return {
       title: "Workout",
@@ -973,6 +1710,7 @@ class HalthyWorkoutCard extends HTMLElement {
       image: resolvedImage,
       chips: [],
       entity_id: entityId,
+      archiveKey: relativePath,
     };
   }
 
@@ -989,15 +1727,15 @@ class HalthyWorkoutCard extends HTMLElement {
       return resolvedMediaSourceAuthSafe;
     }
 
-    return await this._authSafeImageUrl(this._normalizeImageUrl(`/media/local/${relativePath}`));
+    if (relativePath) {
+      return await this._authSafeImageUrl(this._normalizeImageUrl(`/media/local/${relativePath}`));
+    }
+    return null;
   }
 
   _isProtectedMediaLocalUrl(url) {
-    if (!url || typeof url !== "string") {
-      return false;
-    }
-    const normalized = url.trim().toLowerCase();
-    return normalized.startsWith("/media/local/") || normalized.includes("/media/local/");
+    const absoluteUrl = this._sameOriginAbsoluteUrl(url);
+    return !!absoluteUrl && absoluteUrl.pathname.startsWith("/media/local/");
   }
 
   async _resolveMediaSourceUrl(mediaSourceId) {
@@ -1032,28 +1770,40 @@ class HalthyWorkoutCard extends HTMLElement {
       return normalized;
     }
 
-    const absoluteUrl = this._absoluteUrl(normalized);
-    const token = this._hass?.auth?.data?.access_token;
-    if (!absoluteUrl || !token || typeof fetch !== "function") {
-      return null;
+    const absoluteUrl = this._sameOriginAbsoluteUrl(normalized);
+    const token = this._frontendAuthToken();
+    if (!absoluteUrl || typeof fetch !== "function") {
+      return normalized;
     }
 
     try {
-      const response = await fetch(absoluteUrl, {
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const response = await fetch(absoluteUrl.toString(), {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "omit",
+        headers,
+        credentials: "same-origin",
       });
       if (!response.ok) {
-        return null;
+        return normalized;
       }
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       this._imageObjectUrls.add(objectUrl);
       return objectUrl;
     } catch (_error) {
-      return null;
+      return normalized;
     }
+  }
+
+  _frontendAuthToken() {
+    const direct = this._firstString(this._hass?.auth?.data?.access_token);
+    if (direct) {
+      return direct;
+    }
+    return this._firstString(
+      this._hass?.connection?.options?.auth?.accessToken,
+      this._hass?.connection?.options?.auth?.data?.access_token
+    );
   }
 
   _absoluteUrl(url) {
@@ -1075,6 +1825,36 @@ class HalthyWorkoutCard extends HTMLElement {
       }
     }
     return trimmed;
+  }
+
+  _sameOriginAbsoluteUrl(url) {
+    if (!url || typeof url !== "string") {
+      return null;
+    }
+
+    const baseHref =
+      typeof window !== "undefined" && window.location?.href
+        ? window.location.href
+        : "http://localhost/";
+    const allowedOrigins = new Set();
+    if (typeof window !== "undefined" && window.location?.origin) {
+      allowedOrigins.add(window.location.origin);
+    }
+
+    if (this._hass && typeof this._hass.hassUrl === "function") {
+      try {
+        allowedOrigins.add(new URL(this._hass.hassUrl("/"), baseHref).origin);
+      } catch (_error) {
+        // If Home Assistant cannot provide a base URL, fall back to window origin only.
+      }
+    }
+
+    try {
+      const absoluteUrl = new URL(this._absoluteUrl(url), baseHref);
+      return allowedOrigins.has(absoluteUrl.origin) ? absoluteUrl : null;
+    } catch (_error) {
+      return null;
+    }
   }
 
   _revokeImageObjectUrls() {
@@ -1112,27 +1892,105 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _archiveTimestampFromFileName(fileName) {
-    const match = /^(\d{8})T(\d{6})Z_/.exec(fileName);
-    if (!match) {
+    const info = this._archiveDateInfoFromFileName(fileName);
+    return info ? info.timestamp : null;
+  }
+
+  _archiveDateInfoFromFileName(fileName) {
+    const source = typeof fileName === "string" ? fileName.trim() : "";
+    if (!source) {
       return null;
     }
 
-    const dateToken = match[1];
-    const timeToken = match[2];
-    const year = Number(dateToken.slice(0, 4));
-    const month = Number(dateToken.slice(4, 6));
-    const day = Number(dateToken.slice(6, 8));
-    const hour = Number(timeToken.slice(0, 2));
-    const minute = Number(timeToken.slice(2, 4));
-    const second = Number(timeToken.slice(4, 6));
+    const compactDateTime = /(\d{8})T(\d{6})Z?/i.exec(source);
+    if (compactDateTime) {
+      const dateToken = compactDateTime[1];
+      const timeToken = compactDateTime[2];
+      const year = Number(dateToken.slice(0, 4));
+      const month = Number(dateToken.slice(4, 6));
+      const day = Number(dateToken.slice(6, 8));
+      const parsed = this._utcDateFromParts(
+        year,
+        month,
+        day,
+        Number(timeToken.slice(0, 2)),
+        Number(timeToken.slice(2, 4)),
+        Number(timeToken.slice(4, 6))
+      );
+      if (parsed) {
+        return {
+          timestamp: parsed,
+          dayKey: this._dayKeyFromParts(year, month, day),
+        };
+      }
+    }
 
+    const separatedDateTime = /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})[T _-]?(\d{2})[:._-]?(\d{2})(?:[:._-]?(\d{2}))?/.exec(
+      source
+    );
+    if (separatedDateTime) {
+      const year = Number(separatedDateTime[1]);
+      const month = Number(separatedDateTime[2]);
+      const day = Number(separatedDateTime[3]);
+      const parsed = this._utcDateFromParts(
+        year,
+        month,
+        day,
+        Number(separatedDateTime[4]),
+        Number(separatedDateTime[5]),
+        Number(separatedDateTime[6] || "0")
+      );
+      if (parsed) {
+        return {
+          timestamp: parsed,
+          dayKey: this._dayKeyFromParts(year, month, day),
+        };
+      }
+    }
+
+    const dateOnly = /(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})/.exec(source);
+    if (dateOnly) {
+      const year = Number(dateOnly[1]);
+      const month = Number(dateOnly[2]);
+      const day = Number(dateOnly[3]);
+      const parsed = this._utcDateFromParts(
+        year,
+        month,
+        day,
+        0,
+        0,
+        0
+      );
+      if (parsed) {
+        return {
+          timestamp: parsed,
+          dayKey: this._dayKeyFromParts(year, month, day),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  _utcDateFromParts(year, month, day, hour, minute, second) {
+    if ([year, month, day, hour, minute, second].some((value) => !Number.isFinite(value))) {
+      return null;
+    }
+    const parsed = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
     if (
-      [year, month, day, hour, minute, second].some((value) => !Number.isFinite(value))
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() + 1 !== month ||
+      parsed.getUTCDate() !== day ||
+      parsed.getUTCHours() !== hour ||
+      parsed.getUTCMinutes() !== minute ||
+      parsed.getUTCSeconds() !== second
     ) {
       return null;
     }
-
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    return parsed;
   }
 
   _relativePathFromMediaSourceId(mediaSourceId) {
@@ -1143,18 +2001,85 @@ class HalthyWorkoutCard extends HTMLElement {
     if (!mediaSourceId.startsWith(prefix)) {
       return "";
     }
-    return mediaSourceId.slice(prefix.length).replace(/^\/+/, "");
+    const encodedPath = mediaSourceId.slice(prefix.length).replace(/^\/+/, "");
+    if (!encodedPath) {
+      return "";
+    }
+    const withoutQuery = encodedPath.split(/[?#]/, 1)[0];
+    try {
+      return decodeURIComponent(withoutQuery).replace(/^\/+/, "");
+    } catch (_error) {
+      return withoutQuery.replace(/^\/+/, "");
+    }
   }
 
   _relativePathFromLocalUrl(localUrl) {
     if (!localUrl || typeof localUrl !== "string") {
       return "";
     }
-    const prefix = "/media/local/";
-    if (!localUrl.startsWith(prefix)) {
+    const trimmed = localUrl.trim();
+    const marker = "/media/local/";
+    const markerIndex = trimmed.indexOf(marker);
+    if (markerIndex < 0) {
       return "";
     }
-    return localUrl.slice(prefix.length).replace(/^\/+/, "");
+    const pathWithPrefix = trimmed.slice(markerIndex + marker.length);
+    const withoutQuery = pathWithPrefix.split(/[?#]/, 1)[0];
+    try {
+      return decodeURIComponent(withoutQuery).replace(/^\/+/, "");
+    } catch (_error) {
+      return withoutQuery.replace(/^\/+/, "");
+    }
+  }
+
+  _relativePathFromWorkoutImageApiUrl(url) {
+    if (!url || typeof url !== "string") {
+      return "";
+    }
+    try {
+      const parsed = new URL(url, window.location.origin);
+      if (parsed.pathname !== "/api/halthy/workout_image") {
+        return "";
+      }
+      return this._normalizeArchiveKey(parsed.searchParams.get("path") || "");
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  _archiveKeyFromWorkoutItem(item, image) {
+    if (!item || typeof item !== "object") {
+      return this._normalizeArchiveKey(
+        this._firstString(
+          this._relativePathFromLocalUrl(image),
+          this._relativePathFromMediaSourceId(image),
+          this._relativePathFromWorkoutImageApiUrl(image)
+        )
+      );
+    }
+
+    return this._normalizeArchiveKey(
+      this._firstString(
+        item.archive_relative_path,
+        item.relative_path,
+        item.file_path,
+        item.path,
+        this._relativePathFromLocalUrl(item.archive_local_url),
+        this._relativePathFromLocalUrl(item.local_url),
+        this._relativePathFromMediaSourceId(item.archive_media_source_id),
+        this._relativePathFromMediaSourceId(item.media_source_id),
+        this._relativePathFromLocalUrl(image),
+        this._relativePathFromMediaSourceId(image),
+        this._relativePathFromWorkoutImageApiUrl(image)
+      )
+    );
+  }
+
+  _normalizeArchiveKey(pathValue) {
+    if (!pathValue || typeof pathValue !== "string") {
+      return "";
+    }
+    return pathValue.trim().replace(/^\/+/, "").replace(/\/{2,}/g, "/");
   }
 
   _parentPath(pathValue) {
@@ -1292,13 +2217,102 @@ class HalthyWorkoutCard extends HTMLElement {
     if (!parsed) {
       return typeof value === "string" ? value : "";
     }
-    return new Intl.DateTimeFormat(undefined, {
+
+    if (this._hass && typeof this._hass.formatDateTime === "function") {
+      return this._hass.formatDateTime(parsed);
+    }
+
+    const locale = this._hass?.locale || {};
+    const dateLanguage = typeof locale.language === "string" && locale.language.trim() ? locale.language : undefined;
+    const options = {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-    }).format(parsed);
+    };
+
+    if (locale.time_format === "12") {
+      options.hour12 = true;
+    } else if (locale.time_format === "24") {
+      options.hour12 = false;
+    }
+
+    return new Intl.DateTimeFormat(dateLanguage, options).format(parsed);
+  }
+
+  _formatTime(value) {
+    const parsed = value instanceof Date ? value : this._toDate(value);
+    if (!parsed) {
+      return "";
+    }
+
+    if (this._hass && typeof this._hass.formatTime === "function") {
+      return this._hass.formatTime(parsed);
+    }
+
+    const locale = this._hass?.locale || {};
+    const dateLanguage = typeof locale.language === "string" && locale.language.trim() ? locale.language : undefined;
+    const options = {
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+    if (locale.time_format === "12") {
+      options.hour12 = true;
+    } else if (locale.time_format === "24") {
+      options.hour12 = false;
+    }
+    return new Intl.DateTimeFormat(dateLanguage, options).format(parsed);
+  }
+
+  _stateSignature(stateObj) {
+    if (!stateObj || typeof stateObj !== "object") {
+      return "missing";
+    }
+    const attrs = stateObj.attributes || {};
+    const rawWorkouts = this._firstPresent(
+      attrs[this._config?.workouts_attribute],
+      attrs.saved_workouts,
+      attrs.workouts,
+      attrs.workout_gallery,
+      attrs.gallery,
+      attrs.items
+    );
+    return [
+      String(stateObj.state ?? ""),
+      this._firstString(attrs.archive_file_name),
+      this._firstString(attrs.archive_relative_path),
+      this._firstString(attrs.archive_local_url),
+      this._firstString(attrs.archive_media_source_id),
+      this._workoutListSignature(rawWorkouts),
+      this._firstString(attrs.workout_end, attrs.measurement_timestamp, attrs.last_pushed),
+    ].join("|");
+  }
+
+  _workoutListSignature(rawWorkouts) {
+    const list = this._coerceWorkoutList(rawWorkouts);
+    if (!list.length) {
+      return "0";
+    }
+    const first = list[0] || {};
+    const last = list[list.length - 1] || {};
+    const firstToken = this._firstString(
+      first.workout_end,
+      first.end,
+      first.end_time,
+      first.date,
+      first.measurement_timestamp,
+      first.last_pushed
+    );
+    const lastToken = this._firstString(
+      last.workout_end,
+      last.end,
+      last.end_time,
+      last.date,
+      last.measurement_timestamp,
+      last.last_pushed
+    );
+    return `${list.length}:${firstToken}:${lastToken}`;
   }
 
   _calendarIcon() {
@@ -1362,18 +2376,26 @@ class HalthyWorkoutCardEditor extends HTMLElement {
 
     const users = Array.isArray(this._users) ? this._users : [];
     const selectedUser = _sanitizeIdentifier(this._config.user || _userFromWorkoutEntity(this._config.entity));
-    const defaultEntity = _entityFromUser(selectedUser);
-    const entityValue =
-      typeof this._config.entity === "string" && this._config.entity.trim()
-        ? this._config.entity.trim()
-        : defaultEntity;
+    const calendarIconValue =
+      typeof this._config.calendar_icon === "string" && this._config.calendar_icon.trim()
+        ? this._config.calendar_icon.trim()
+        : "mdi:calendar-month";
+    const hasIconPicker = typeof customElements !== "undefined" && !!customElements.get("ha-icon-picker");
+    const calendarIconField = hasIconPicker
+      ? `
+          <ha-icon-picker id="calendar_icon" value="${this._escapeAttr(calendarIconValue)}"></ha-icon-picker>
+          <div class="hint">Start typing an icon name (for example: mdi:calendar-month).</div>
+        `
+      : `
+          <input id="calendar_icon" type="text" placeholder="mdi:calendar-month" value="${this._escapeAttr(
+            calendarIconValue
+          )}" />
+        `;
 
-    const userOptions = users
-      .map((user) => {
-        const selected = user.id === selectedUser ? "selected" : "";
-        return `<option value="${this._escapeAttr(user.id)}" ${selected}>${this._escape(user.label)}</option>`;
-      })
-      .join("");
+    const userSelectorOptions = users.map((user) => ({
+      value: user.id,
+      label: user.label,
+    }));
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1401,135 +2423,104 @@ class HalthyWorkoutCardEditor extends HTMLElement {
           padding: 8px 10px;
           font: inherit;
         }
+        ha-icon-picker {
+          display: block;
+        }
         .hint {
           color: var(--secondary-text-color);
           font-size: 0.8rem;
         }
-        .toggle-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
       </style>
       <div class="wrapper">
         <div class="field">
-          <label for="user">Halthy user</label>
-          <select id="user">
-            <option value="">Manual entity</option>
-            ${userOptions}
-          </select>
+          <label for="user_selector">Halthy user</label>
+          <ha-selector id="user_selector"></ha-selector>
           <div class="hint">
             ${
               users.length
                 ? "Users are auto-detected from your Halthy integration entities."
-                : "No Halthy users detected yet. Keep manual entity or wait for first sync."
+                : "No Halthy users detected yet. Wait for first sync."
             }
           </div>
         </div>
 
         <div class="field">
-          <label for="entity">Workout image entity</label>
-          <input id="entity" type="text" placeholder="image.username_workout" value="${this._escapeAttr(
-            entityValue
-          )}" />
-        </div>
-
-        <div class="field">
-          <label for="title">Title</label>
-          <input id="title" type="text" value="${this._escapeAttr(this._config.title || "")}" />
-        </div>
-
-        <div class="field">
-          <label for="workouts_attribute">Workouts attribute (optional)</label>
-          <input id="workouts_attribute" type="text" value="${this._escapeAttr(
-            this._config.workouts_attribute || ""
-          )}" />
+          <label for="title_selector">Title</label>
+          <ha-selector id="title_selector"></ha-selector>
         </div>
 
         <div class="field">
           <label for="calendar_icon">Calendar icon</label>
-          <input id="calendar_icon" type="text" placeholder="mdi:calendar-month" value="${this._escapeAttr(
-            this._config.calendar_icon || "mdi:calendar-month"
-          )}" />
-        </div>
-
-        <div class="toggle-row">
-          <input id="use_media_archive" type="checkbox" ${
-            this._config.use_media_archive !== false ? "checked" : ""
-          } />
-          <label for="use_media_archive">Use media archive from Halthy integration</label>
+          ${calendarIconField}
         </div>
       </div>
     `;
 
-    const userSelect = this.shadowRoot.getElementById("user");
-    const entityInput = this.shadowRoot.getElementById("entity");
-    const titleInput = this.shadowRoot.getElementById("title");
-    const workoutsAttributeInput = this.shadowRoot.getElementById("workouts_attribute");
+    const userSelector = this.shadowRoot.getElementById("user_selector");
+    const titleSelector = this.shadowRoot.getElementById("title_selector");
     const calendarIconInput = this.shadowRoot.getElementById("calendar_icon");
-    const mediaArchiveInput = this.shadowRoot.getElementById("use_media_archive");
 
-    if (userSelect) {
-      userSelect.value = users.find((user) => user.id === selectedUser) ? selectedUser : "";
-      userSelect.addEventListener("change", (event) => {
-        const nextUser = _sanitizeIdentifier(event.target.value);
+    if (userSelector) {
+      userSelector.hass = this._hass;
+      userSelector.selector = {
+        select: {
+          mode: "dropdown",
+          options: userSelectorOptions,
+          custom_value: false,
+          multiple: false,
+        },
+      };
+      if ("value" in userSelector) {
+        userSelector.value = userSelectorOptions.some((option) => option.value === selectedUser) ? selectedUser : "";
+      }
+
+      const onUserChanged = (event) => {
+        const nextUser = _sanitizeIdentifier(event?.detail?.value ?? event?.target?.value);
         if (nextUser) {
           this._emitConfig({
             user: nextUser,
             entity: _entityFromUser(nextUser),
           });
-          return;
         }
-        this._emitConfig({
-          user: "",
-        });
-      });
+      };
+
+      userSelector.addEventListener("value-changed", onUserChanged);
+      userSelector.addEventListener("change", onUserChanged);
     }
 
-    if (entityInput) {
-      entityInput.addEventListener("change", (event) => {
-        const nextEntity = String(event.target.value || "").trim();
-        const nextUser = _userFromWorkoutEntity(nextEntity);
-        this._emitConfig({
-          entity: nextEntity,
-          user: nextUser,
-        });
-      });
-    }
+    if (titleSelector) {
+      titleSelector.hass = this._hass;
+      titleSelector.selector = { text: {} };
+      if ("value" in titleSelector) {
+        titleSelector.value = String(this._config.title || "");
+      }
 
-    if (titleInput) {
-      titleInput.addEventListener("change", (event) => {
+      const onTitleChanged = (event) => {
         this._emitConfig({
-          title: String(event.target.value || ""),
+          title: String(event?.detail?.value ?? event?.target?.value ?? ""),
         });
-      });
-    }
+      };
 
-    if (workoutsAttributeInput) {
-      workoutsAttributeInput.addEventListener("change", (event) => {
-        const value = String(event.target.value || "").trim();
-        this._emitConfig({
-          workouts_attribute: value || undefined,
-        });
-      });
+      titleSelector.addEventListener("value-changed", onTitleChanged);
+      titleSelector.addEventListener("change", onTitleChanged);
     }
 
     if (calendarIconInput) {
-      calendarIconInput.addEventListener("change", (event) => {
-        const value = String(event.target.value || "").trim();
+      if ("value" in calendarIconInput && !calendarIconInput.value) {
+        calendarIconInput.value = calendarIconValue;
+      }
+
+      const onCalendarIconChanged = (event) => {
+        const value = String(event?.detail?.value ?? event?.target?.value ?? "").trim();
         this._emitConfig({
           calendar_icon: value || "mdi:calendar-month",
         });
-      });
+      };
+
+      calendarIconInput.addEventListener("value-changed", onCalendarIconChanged);
+      calendarIconInput.addEventListener("change", onCalendarIconChanged);
     }
 
-    if (mediaArchiveInput) {
-      mediaArchiveInput.addEventListener("change", (event) => {
-        this._emitConfig({
-          use_media_archive: !!event.target.checked,
-        });
-      });
-    }
   }
 
   _emitConfig(patch) {
@@ -1553,7 +2544,6 @@ class HalthyWorkoutCardEditor extends HTMLElement {
         composed: true,
       })
     );
-    this._render();
   }
 
   _escape(value) {

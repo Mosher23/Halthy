@@ -20,7 +20,7 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 - Optional import from Home Assistant sensors back into HealthKit (in app)
 - Optional raw export to InfluxDB for long-range history and Grafana dashboards
 - Home Assistant UI setup with multi-user ownership handling
-- Built-in `custom:halthy-workout-card` Lovelace card (latest workout + calendar)
+- Built-in `custom:halthy-workout-card` Lovelace card with workout map navigation and calendar archive
 
 ## 🔄 How It Works
 
@@ -56,7 +56,8 @@ To improve history inside Home Assistant:
 
 - When a pushed numeric metric includes `measurement_timestamp`, Halthy imports it into recorder statistics.
 - Imports are deduplicated by per-metric cursors.
-- Statistics are bucketed hourly for reliable long-term charting.
+- Statistics are external Home Assistant long-term statistics, so they are bucketed hourly by design.
+- Home Assistant's 5-minute short-term statistics apply to normal recorder-derived sensor statistics, not these historical `halthy:*` imports.
 
 For full raw sample history and advanced analytics, use optional InfluxDB export.
 
@@ -66,7 +67,7 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 
 1. Open **HACS**.
 2. Go to **Integrations** and add this repository as a custom integration repository if needed:
-   - `https://github.com/Mosher23/Halthy-Bridge`
+   - `https://github.com/Mosher23/Halthy`
 3. Install **Halthy**.
 4. Restart Home Assistant.
 5. Go to **Settings -> Devices & Services -> Add Integration**.
@@ -85,12 +86,15 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 
 ## 🗂️ Built-in Workout Card
 
-Halthy now bundles a Lovelace card: `custom:halthy-workout-card`.
+Halthy bundles a Lovelace card: `custom:halthy-workout-card`.
 
 - The integration auto-registers the card module at startup.
 - In most setups you can use the card immediately in dashboard YAML without adding a manual resource.
 - If your frontend cache is stale, hard refresh the browser.
 - Manual fallback resource URL: `/halthy/halthy-workout-card.js`
+- The main card shows the selected workout route map and lets you move between archived workouts with transparent left/right map overlay buttons.
+- The right overlay is hidden when the newest workout is already selected.
+- The calendar popup shows a larger route preview, a visually separated calendar, highlighted workout days, and a selector when multiple workouts exist on the same day.
 
 Example:
 
@@ -112,7 +116,12 @@ When the app uploads a workout route image, Halthy now archives it on disk:
 Same-workout replacement behavior:
 
 - If a newer image for the same workout is uploaded, the older archived file is replaced.
-- Workout identity uses `workout_uuid` when present, with fallback to workout metadata fingerprinting.
+- Workout identity uses a stable `workout_uuid` when present, with fallback to workout metadata fingerprinting.
+- Newly archived workouts also store a small metadata sidecar so the card can show readable workout types, chips, and zone summaries for archived workouts.
+- Older archived images without metadata still display, but may fall back to a generic `Workout` title unless matching entity metadata is available.
+- The card reads archive data through authenticated integration endpoints:
+  - `GET /api/halthy/workouts`
+  - `GET /api/halthy/workout_image`
 
 Workout image entities expose archive metadata attributes including:
 
@@ -121,6 +130,8 @@ Workout image entities expose archive metadata attributes including:
 - `archive_file_name`
 - `archive_workout_timestamp`
 - `archive_replaced_file_count`
+- `heart_rate_zones`
+- `cycling_power_zones`
 
 ## ⚙️ Home Assistant Integration Options
 
@@ -213,6 +224,8 @@ Each configured person gets diagnostic entities:
 
 - `sensor.<app_username>_last_update`
   - Timestamp of the latest accepted update for that user
+- `sensor.<app_username>_last_full_sync`
+  - Timestamp of the latest full sync that applied at least one change
 - `sensor.<app_username>_daily_upload_count`
   - Number of full sync uploads accepted for current local day
   - Automatically resets daily
@@ -251,6 +264,6 @@ Use this when you want:
 ## 🛠️ Troubleshooting
 
 - **`401` or `403`**: token missing, expired, or wrong user ownership for target username.
-- **Push works but history looks sparse**: this is usually state-vs-history limitation; enable recorder statistics and/or InfluxDB.
+- **Push works but history looks sparse**: Home Assistant external statistics are hourly; use InfluxDB for raw high-resolution history.
 - **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.
 - **Sensors not updating**: verify app username in app exactly matches integration App Username.

@@ -14,13 +14,14 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
 - Provides diagnostic and control entities for sync monitoring
 - Supports optional logbook activity logging
 - Imports numeric samples with timestamps into Home Assistant recorder statistics
+- Includes a bundled workout card with route map navigation, calendar archive, and multi-workout day selection
 
 ## Installation
 
 ### HACS (recommended)
 
 1. Open **HACS**.
-2. Add repository `https://github.com/Mosher23/Halthy-Bridge` as a custom integration repository if needed.
+2. Add repository `https://github.com/Mosher23/Halthy` as a custom integration repository if needed.
 3. Install **Halthy**.
 4. Restart Home Assistant.
 
@@ -45,6 +46,9 @@ Halthy includes a bundled Lovelace card: `custom:halthy-workout-card`.
 - The module is served by the integration and auto-registered on startup.
 - You can usually add the card directly to your dashboard without manual resource setup.
 - Manual fallback resource URL: `/halthy/halthy-workout-card.js`
+- The main card can browse archived workout maps with transparent left/right overlay buttons.
+- The right overlay is hidden when the newest workout is selected.
+- The calendar popup is larger, has a separated calendar section, highlights workout days, and shows a selector for multiple workouts on the same day.
 
 Minimal config:
 
@@ -66,7 +70,12 @@ When the app uploads a workout route image, Halthy archives it in Home Assistant
 Same-workout replacement:
 
 - Uploading a newer image for the same workout replaces older archived files for that workout.
-- Workout matching uses `workout_uuid` when available, with metadata fingerprint fallback.
+- Workout matching uses a stable `workout_uuid` when available, with metadata fingerprint fallback.
+- Newly archived images store small metadata sidecars so the card can show readable workout types, summary chips, and zone data.
+- Existing archived images without metadata still display, but may fall back to a generic `Workout` title.
+- The card reads the archive through authenticated endpoints:
+  - `GET /api/halthy/workouts`
+  - `GET /api/halthy/workout_image`
 
 Workout image entity attributes include:
 
@@ -75,6 +84,8 @@ Workout image entity attributes include:
 - `archive_file_name`
 - `archive_workout_timestamp`
 - `archive_replaced_file_count`
+- `heart_rate_zones`
+- `cycling_power_zones`
 
 ## Integration Options
 
@@ -104,6 +115,7 @@ Open **Settings -> Devices & Services -> Halthy -> Configure**.
 ### Diagnostic entities
 
 - `sensor.<app_username>_last_update`
+- `sensor.<app_username>_last_full_sync`
 - `sensor.<app_username>_daily_upload_count`
 
 ### Control/config entities
@@ -124,6 +136,8 @@ Both services accept optional `app_username` to target one configured user.
 - `POST /api/halthy/push`
 - `GET /api/halthy/command`
 - `POST /api/halthy/command_ack`
+- `GET /api/halthy/workouts`
+- `GET /api/halthy/workout_image`
 
 ## Recorder Statistics Behavior
 
@@ -132,9 +146,11 @@ Both services accept optional `app_username` to target one configured user.
 
 When a numeric metric arrives with `measurement_timestamp`, the integration imports it into recorder statistics (hourly buckets, cursor-based deduplication).
 
+These are external Home Assistant long-term statistics, so `halthy:*` statistic series are hourly. Home Assistant's 5-minute short-term statistics apply to normal recorder-derived sensor statistics, not these historical imports. Use InfluxDB from the app for raw high-resolution history.
+
 ## Troubleshooting
 
 - **Config flow does not open**: restart Home Assistant and check integration logs for config flow errors.
 - **`401` / `403` on upload**: verify long-lived token and user ownership for configured username.
 - **Entities not updating**: verify app username exactly matches **App Username** in the integration entry.
-- **History gaps in dashboards**: confirm payload includes `measurement_timestamp` and recorder is enabled.
+- **History gaps in dashboards**: confirm payload includes `measurement_timestamp`; use InfluxDB when you need raw high-resolution history instead of hourly HA external statistics.
