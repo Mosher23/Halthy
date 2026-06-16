@@ -4,17 +4,16 @@ on:
   push:
   pull_request:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Run HACS action
         uses: hacs/action@main
+        env:
+          REPOSITORY_REF: ${{ github.head_ref || github.ref_name }}
         with:
           category: integration
