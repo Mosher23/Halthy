@@ -63,8 +63,10 @@ from .const import (
     CONF_ACTIVITY_LOG_MODE,
     CONF_DISPLAY_NAME,
     CONF_OWNER_USER_ID,
+    CONF_STATISTICS_ENABLED,
     CONF_TEMPERATURE_UNIT,
     DEFAULT_ACTIVITY_LOG_MODE,
+    DEFAULT_STATISTICS_ENABLED,
     DEFAULT_TEMPERATURE_UNIT,
     DOMAIN,
     COMMAND_ACK_ENDPOINT_NAME,
@@ -437,6 +439,7 @@ class IntegrationRuntime:
     owner_user_id: str | None = None
     temperature_unit_preference: str = DEFAULT_TEMPERATURE_UNIT
     activity_log_mode: str = DEFAULT_ACTIVITY_LOG_MODE
+    statistics_enabled: bool = DEFAULT_STATISTICS_ENABLED
     sensors: dict[str, HalthySensorState] = field(default_factory=dict)
     images: dict[str, HalthyImageState] = field(default_factory=dict)
     statistics_cursors: dict[str, str] = field(default_factory=dict)
@@ -1064,6 +1067,27 @@ def _read_workout_archive_metadata(image_path: Path) -> dict[str, Any]:
     return metadata
 
 
+def _workout_archive_record_identity(
+    file_path: Path,
+    metadata: dict[str, Any],
+) -> str:
+    raw_workout_id = _first_nonempty_attribute_value(
+        metadata,
+        WORKOUT_ARCHIVE_ID_ATTRIBUTE_KEYS,
+    )
+    if raw_workout_id is not None:
+        normalized_workout_id = sanitize_identifier(raw_workout_id)
+        if normalized_workout_id:
+            return f"uuid:{normalized_workout_id}"
+
+    file_stem_parts = file_path.stem.split("_", 1)
+    if len(file_stem_parts) == 2:
+        fingerprint = file_stem_parts[1].strip().lower()
+        if fingerprint.startswith(("uuid_", "sig_")):
+            return f"fingerprint:{fingerprint}"
+    return ""
+
+
 def _store_workout_archive_file(
     archive_dir: Path,
     file_name: str,
@@ -1287,6 +1311,7 @@ def _collect_workout_archive_records(
             workout_timestamp = timestamp_from_name or modified_at
             encoded_relative_path = quote(relative_path, safe="/")
             metadata = _read_workout_archive_metadata(file_path)
+            workout_identity = _workout_archive_record_identity(file_path, metadata)
             title = _first_nonempty_attribute_value(
                 metadata,
                 (*WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS, "activity_type", "workout_kind", "title", "name"),
@@ -1301,6 +1326,7 @@ def _collect_workout_archive_records(
                 "modified_at": modified_at.isoformat().replace("+00:00", "Z"),
                 "_sort_timestamp": workout_timestamp.timestamp(),
                 "_sort_modified": modified_at.timestamp(),
+                "_workout_identity": workout_identity,
             }
             for key, value in metadata.items():
                 if key not in record:
@@ -1317,10 +1343,18 @@ def _collect_workout_archive_records(
         ),
         reverse=True,
     )
+    deduplicated_records: list[dict[str, Any]] = []
+    seen_workout_identities: set[str] = set()
     for item in records:
+        workout_identity = str(item.pop("_workout_identity", "")).strip()
+        if workout_identity:
+            if workout_identity in seen_workout_identities:
+                continue
+            seen_workout_identities.add(workout_identity)
         item.pop("_sort_timestamp", None)
         item.pop("_sort_modified", None)
-    return records[:limit]
+        deduplicated_records.append(item)
+    return deduplicated_records[:limit]
 
 
 async def _async_collect_workout_archive_records(
@@ -1337,14 +1371,23 @@ async def _async_collect_workout_archive_records(
     )
 
 
-def _workout_archive_image_url(username: str, relative_path: str, token: str) -> str:
+def _workout_archive_image_url(
+    username: str,
+    relative_path: str,
+    token: str,
+    version: str | None = None,
+) -> str:
     encoded_username = quote(username, safe="")
     encoded_path = quote(relative_path, safe="")
     encoded_token = quote(token, safe="")
-    return (
+    url = (
         f"{WORKOUT_ARCHIVE_IMAGE_ENDPOINT_PATH}"
         f"?username={encoded_username}&path={encoded_path}&token={encoded_token}"
     )
+    normalized_version = str(version or "").strip()
+    if normalized_version:
+        url += f"&v={quote(normalized_version, safe='')}"
+    return url
 
 
 def _normalize_requested_relative_path(raw_path: str) -> str:
@@ -1408,6 +1451,12 @@ def _parse_updated_at(raw: Any) -> datetime:
 
 def _statistics_id_for_metric(username: str, metric_key: str) -> str:
     return f"{STATISTICS_SOURCE}:{_sanitize(username)}_{_sanitize(metric_key)}"
+
+
+def _statistics_friendly_name(username: str, metric_name: str) -> str:
+    resolved_username = username.strip() or "unknown"
+    resolved_metric_name = metric_name.strip() or "Metric"
+    return f"{resolved_metric_name} ({resolved_username})"
 
 
 def _statistics_source_for_id(statistic_id: str) -> str:
@@ -1543,6 +1592,9 @@ def _statistics_candidates_from_sensor(
     unit: str | None,
     attributes: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    if not runtime.statistics_enabled:
+        return []
+
     measurement_raw = _measurement_timestamp_value(attributes)
     measurement_at = _parse_measurement_timestamp(measurement_raw)
     numeric_state = _numeric_state_value(state)
@@ -1561,7 +1613,7 @@ def _statistics_candidates_from_sensor(
     return [
         {
             "statistic_id": statistic_id,
-            "name": metric_name,
+            "name": _statistics_friendly_name(runtime.app_username, metric_name),
             "unit": unit,
             "start": measurement_at,
             "value": numeric_state,
@@ -3014,6 +3066,7 @@ class HalthyWorkoutArchiveView(HomeAssistantView):
                     runtime_username,
                     str(workout.get("relative_path", "")),
                     image_token,
+                    str(workout.get("modified_at", "")),
                 ),
             }
             for workout in workouts
@@ -3080,7 +3133,9 @@ class HalthyWorkoutArchiveImageView(HomeAssistantView):
         if resolved_path is None:
             return web.Response(status=404)
 
-        return web.FileResponse(resolved_path)
+        response = web.FileResponse(resolved_path)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
 
 
 async def _async_register_workout_card_module(hass: HomeAssistant) -> None:
@@ -3471,13 +3526,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not isinstance(stored_entry, dict):
         stored_entry = {}
 
-    app_username = str(entry.data.get(CONF_APP_USERNAME) or "").strip()
-    display_name = str(entry.data.get(CONF_DISPLAY_NAME) or "").strip()
-    if not app_username:
-        app_username = str(entry.data.get(CONF_DISPLAY_NAME) or entry.title).strip()
-    if not app_username:
-        app_username = "unknown"
-    if not display_name:
+    entry_app_username = str(entry.data.get(CONF_APP_USERNAME) or "").strip()
+    entry_display_name = str(entry.data.get(CONF_DISPLAY_NAME) or "").strip()
+    stored_app_username = stored_entry.get("app_username")
+    stored_display_name = stored_entry.get("display_name")
+
+    if entry_app_username:
+        app_username = entry_app_username
+    elif isinstance(stored_app_username, str) and stored_app_username.strip():
+        app_username = stored_app_username.strip()
+    else:
+        app_username = str(entry.data.get(CONF_DISPLAY_NAME) or entry.title).strip() or "unknown"
+
+    if CONF_DISPLAY_NAME in entry.data:
+        display_name = entry_display_name or app_username
+    elif isinstance(stored_display_name, str) and stored_display_name.strip():
+        display_name = stored_display_name.strip()
+    else:
         display_name = app_username
 
     configured_username = _sanitize(app_username)
@@ -3490,20 +3555,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     activity_log_mode = _coerce_activity_log_mode(
         entry.options.get(CONF_ACTIVITY_LOG_MODE, DEFAULT_ACTIVITY_LOG_MODE)
     )
+    statistics_enabled = bool(
+        entry.options.get(
+            CONF_STATISTICS_ENABLED,
+            entry.data.get(CONF_STATISTICS_ENABLED, DEFAULT_STATISTICS_ENABLED),
+        )
+    )
 
     stored_username = stored_entry.get("configured_username")
-    if isinstance(stored_username, str) and stored_username.strip():
+    if not entry_app_username and isinstance(stored_username, str) and stored_username.strip():
         configured_username = _sanitize(stored_username)
-
-    stored_app_username = stored_entry.get("app_username")
-    if isinstance(stored_app_username, str) and stored_app_username.strip():
-        app_username = stored_app_username.strip()
-
-    stored_display_name = stored_entry.get("display_name")
-    if isinstance(stored_display_name, str) and stored_display_name.strip():
-        display_name = stored_display_name.strip()
-    elif not display_name:
-        display_name = app_username
 
     stored_owner_user_id = stored_entry.get("owner_user_id")
     if isinstance(stored_owner_user_id, str) and stored_owner_user_id.strip():
@@ -3543,6 +3604,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         owner_user_id=owner_user_id,
         temperature_unit_preference=temperature_unit_preference,
         activity_log_mode=activity_log_mode,
+        statistics_enabled=statistics_enabled,
         force_upload_interval_seconds=force_upload_interval_seconds,
         pending_force_upload_command=pending_force_upload_command,
         last_force_upload_ack_at=last_force_upload_ack_at,

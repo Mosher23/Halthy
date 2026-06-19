@@ -28,7 +28,7 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 
 1. The app reads selected HealthKit metrics and optional workout route images.
 2. The app sends one authenticated payload to `/api/halthy/push` with:
-   - app username
+   - username
    - device ID
    - selected metric keys
    - `sensors[]` values and attributes
@@ -73,7 +73,7 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 5. Go to **Settings -> Devices & Services -> Add Integration**.
 6. Select **Halthy**.
 7. Enter:
-   - **App Username** (must match iOS app username)
+   - **Username** (must match the iOS app username)
    - **Display Name** (optional)
 8. Repeat per person.
 
@@ -137,6 +137,23 @@ Workout image entities expose archive metadata attributes including:
 
 Open **Settings -> Devices & Services -> Halthy -> Configure**.
 
+### 👤 Username and Display Name
+
+You can change the configured **Username** and **Display Name** for an existing Halthy entry.
+
+- The username is the routing key used by `/api/halthy/push`, command polling, services, and the workout archive.
+- After changing it in Home Assistant, update the username in the iOS app to match.
+- Existing entities may keep their old entity IDs until Home Assistant or the entity registry renames them, but new data is routed through the updated username.
+
+### 📊 Historical Statistics
+
+Enable or disable **Import historical statistics** independently for each configured person.
+
+- Enabled by default to preserve existing behavior.
+- When enabled, timestamped numeric samples are imported as `halthy:*` hourly long-term statistics.
+- When disabled, normal `sensor.*` entities continue updating, but no new `halthy:*` statistic rows are imported.
+- Disabling the option does not delete historical statistics already stored by Home Assistant.
+
 ### 🌡️ Temperature Unit
 
 Choose how incoming temperature metrics are exposed:
@@ -163,7 +180,7 @@ Open **Halthy -> Settings**.
 
 - **Home Assistant URL** (HTTPS)
 - **Access Token** (Home Assistant long-lived token)
-- **Username** (must match integration App Username)
+- **Username** (must match the integration Username)
 
 ### 👍 Recommended
 
@@ -266,4 +283,4 @@ Use this when you want:
 - **`401` or `403`**: token missing, expired, or wrong user ownership for target username.
 - **Push works but history looks sparse**: Home Assistant external statistics are hourly; use InfluxDB for raw high-resolution history.
 - **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.
-- **Sensors not updating**: verify app username in app exactly matches integration App Username.
+- **Sensors not updating**: verify the username in the app exactly matches the integration Username.

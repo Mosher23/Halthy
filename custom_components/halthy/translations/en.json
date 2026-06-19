@@ -3,10 +3,11 @@
     "step": {
       "user": {
         "title": "Halthy",
-        "description": "Configure one app username for this Halthy entry.",
+        "description": "Configure one username for this Halthy entry.",
         "data": {
-          "app_username": "App username",
-          "name": "Display name (optional)"
+          "app_username": "Username",
+          "name": "Display name (optional)",
+          "statistics_enabled": "Import historical statistics"
         }
       }
     },
@@ -14,19 +15,26 @@
       "invalid_username": "Enter a valid username."
     },
     "abort": {
-      "already_configured": "This app username is already configured."
+      "already_configured": "This username is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Halthy Options",
-        "description": "Choose how temperature values are exposed and whether Halthy writes to the Home Assistant activity log.",
+        "description": "Update the username, display name, units, and activity log behavior for this Halthy entry.",
         "data": {
+          "app_username": "Username",
+          "name": "Display name (optional)",
           "temperature_unit": "Temperature unit",
-          "activity_log_mode": "Activity log mode"
+          "activity_log_mode": "Activity log mode",
+          "statistics_enabled": "Import historical statistics"
         }
       }
+    },
+    "error": {
+      "invalid_username": "Enter a valid username.",
+      "already_configured": "This username is already configured."
     }
   }
 }

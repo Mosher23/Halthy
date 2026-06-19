@@ -816,6 +816,7 @@ class HalthyWorkoutCard extends HTMLElement {
       chips: this._chipsFromWorkout(item),
       entity_id: stateObj.entity_id,
       archiveKey: this._archiveKeyFromWorkoutItem(item, image),
+      workoutId: this._workoutIdFromItem(item),
     };
   }
 
@@ -859,6 +860,7 @@ class HalthyWorkoutCard extends HTMLElement {
       chips: this._chipsFromWorkout(attrs),
       entity_id: stateObj.entity_id,
       archiveKey: this._archiveKeyFromWorkoutItem(attrs, image),
+      workoutId: this._workoutIdFromItem(attrs),
     };
   }
 
@@ -881,25 +883,41 @@ class HalthyWorkoutCard extends HTMLElement {
       return [];
     }
 
-    const deduped = new Map();
+    const deduped = [];
+    const identityIndexes = new Map();
     for (const workout of merged) {
-      const key = this._workoutDedupKey(workout);
-      const existing = deduped.get(key);
-      deduped.set(key, existing ? this._mergeWorkoutRecords(existing, workout) : workout);
+      const identityKeys = this._workoutIdentityKeys(workout);
+      const existingIndex = identityKeys
+        .map((key) => identityIndexes.get(key))
+        .find((index) => Number.isInteger(index));
+
+      if (existingIndex === undefined) {
+        const newIndex = deduped.length;
+        deduped.push(workout);
+        for (const key of identityKeys) {
+          identityIndexes.set(key, newIndex);
+        }
+        continue;
+      }
+
+      const mergedWorkout = this._mergeWorkoutRecords(deduped[existingIndex], workout);
+      deduped[existingIndex] = mergedWorkout;
+      for (const key of [...identityKeys, ...this._workoutIdentityKeys(mergedWorkout)]) {
+        identityIndexes.set(key, existingIndex);
+      }
     }
-    return this._sortWorkouts([...deduped.values()]);
+    return this._sortWorkouts(deduped);
   }
 
-  _workoutDedupKey(workout) {
+  _workoutIdentityKeys(workout) {
     if (!workout || typeof workout !== "object") {
-      return String(workout);
+      return [`value:${String(workout)}`];
     }
-    const timestampIso =
-      workout.timestamp instanceof Date && !Number.isNaN(workout.timestamp.getTime())
-        ? workout.timestamp.toISOString()
-        : "";
-    if (timestampIso) {
-      return `time:${this._firstString(workout.dayKey)}:${timestampIso}`;
+
+    const keys = [];
+    const workoutId = this._firstString(workout.workoutId).trim().toLowerCase();
+    if (workoutId) {
+      keys.push(`id:${workoutId}`);
     }
 
     const archiveKey = this._normalizeArchiveKey(
@@ -911,15 +929,29 @@ class HalthyWorkoutCard extends HTMLElement {
       )
     );
     if (archiveKey) {
-      return `archive:${archiveKey}`;
+      keys.push(`archive:${archiveKey}`);
+    }
+
+    const timestampIso =
+      workout.timestamp instanceof Date && !Number.isNaN(workout.timestamp.getTime())
+        ? workout.timestamp.toISOString()
+        : "";
+    if (!workoutId && !archiveKey && timestampIso) {
+      keys.push(`time:${timestampIso}`);
+    }
+
+    if (keys.length) {
+      return keys;
     }
 
     return [
-      "fallback",
-      this._firstString(workout.dayKey),
-      this._firstString(workout.image),
-      this._firstString(workout.title),
-    ].join(":");
+      [
+        "fallback",
+        this._firstString(workout.dayKey),
+        this._firstString(workout.image),
+        this._firstString(workout.title),
+      ].join(":"),
+    ];
   }
 
   _mergeWorkoutRecords(existing, incoming) {
@@ -937,6 +969,7 @@ class HalthyWorkoutCard extends HTMLElement {
       chips: Array.isArray(existing.chips) && existing.chips.length ? existing.chips : incoming.chips || [],
       entity_id: this._firstString(existing.entity_id, incoming.entity_id),
       archiveKey: this._firstString(existing.archiveKey, incoming.archiveKey),
+      workoutId: this._firstString(existing.workoutId, incoming.workoutId),
     };
   }
 
@@ -1495,6 +1528,7 @@ class HalthyWorkoutCard extends HTMLElement {
       chips: this._chipsFromWorkout(record),
       entity_id: entityId,
       archiveKey: relativePath,
+      workoutId: this._workoutIdFromItem(record),
     };
   }
 
@@ -1711,6 +1745,7 @@ class HalthyWorkoutCard extends HTMLElement {
       chips: [],
       entity_id: entityId,
       archiveKey: relativePath,
+      workoutId: this._workoutIdFromItem(child),
     };
   }
 
@@ -2073,6 +2108,18 @@ class HalthyWorkoutCard extends HTMLElement {
         this._relativePathFromWorkoutImageApiUrl(image)
       )
     );
+  }
+
+  _workoutIdFromItem(item) {
+    if (!item || typeof item !== "object") {
+      return "";
+    }
+    return this._firstString(
+      item.workout_uuid,
+      item.workout_id,
+      item.uuid,
+      item.workoutId
+    ).trim();
   }
 
   _normalizeArchiveKey(pathValue) {

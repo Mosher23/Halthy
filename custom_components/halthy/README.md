@@ -10,7 +10,7 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
 
 - Receives app uploads at `POST /api/halthy/push`
 - Creates and updates `sensor.*` and `image.*` entities in Home Assistant
-- Supports multi-user setup via one config entry per app username
+- Supports multi-user setup via one config entry per username
 - Provides diagnostic and control entities for sync monitoring
 - Supports optional logbook activity logging
 - Imports numeric samples with timestamps into Home Assistant recorder statistics
@@ -35,7 +35,7 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
 1. Go to **Settings -> Devices & Services -> Add Integration**.
 2. Select **Halthy**.
 3. Enter:
-   - **App Username**: must match the username configured in the app
+   - **Username**: must match the username configured in the app
    - **Display Name** (optional): shown as device name in Home Assistant
 4. Repeat for each person.
 
@@ -90,6 +90,22 @@ Workout image entity attributes include:
 ## Integration Options
 
 Open **Settings -> Devices & Services -> Halthy -> Configure**.
+
+### Username and Display Name
+
+You can change the configured **Username** and **Display Name** for an existing entry.
+
+- The username is the routing key used by uploads, commands, services, and workout archive lookup.
+- After changing it in Home Assistant, update the username in the iOS app to match.
+- Existing entities may keep their old entity IDs until Home Assistant or the entity registry renames them.
+
+### Historical Statistics
+
+Enable or disable **Import historical statistics** independently for each configured person.
+
+- Enabled by default.
+- When disabled, current `sensor.*` entities continue updating, but no new `halthy:*` historical statistic rows are imported.
+- Existing statistics are not deleted when the option is disabled.
 
 ### Temperature Unit
 
@@ -152,5 +168,5 @@ These are external Home Assistant long-term statistics, so `halthy:*` statistic 
 
 - **Config flow does not open**: restart Home Assistant and check integration logs for config flow errors.
 - **`401` / `403` on upload**: verify long-lived token and user ownership for configured username.
-- **Entities not updating**: verify app username exactly matches **App Username** in the integration entry.
+- **Entities not updating**: verify the app username exactly matches **Username** in the integration entry.
 - **History gaps in dashboards**: confirm payload includes `measurement_timestamp`; use InfluxDB when you need raw high-resolution history instead of hourly HA external statistics.

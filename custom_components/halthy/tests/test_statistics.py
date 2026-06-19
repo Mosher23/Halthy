@@ -270,15 +270,38 @@ class StatisticsHelpersTests(unittest.TestCase):
             self.assertTrue(records[0]["local_url"].startswith("/media/local/"))
             self.assertIn("/halthy/workouts/tester/", records[0]["local_url"])
 
+    def test_collect_workout_archive_records_prefers_newest_copy_of_same_workout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = pathlib.Path(temp_dir)
+            modern_dir = media_root / "halthy" / "workouts" / "tester"
+            legacy_dir = media_root / "halthy_bridge" / "workouts" / "tester"
+            modern_dir.mkdir(parents=True, exist_ok=True)
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+
+            file_name = "20260401T101112Z_uuid_same_workout.jpg"
+            modern_file = modern_dir / file_name
+            legacy_file = legacy_dir / file_name
+            modern_file.write_bytes(b"new-layout")
+            legacy_file.write_bytes(b"old-layout")
+            os.utime(legacy_file, (1710765276, 1710765276))
+            os.utime(modern_file, (1711966272, 1711966272))
+
+            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+
+            self.assertEqual(len(records), 1)
+            self.assertIn("/halthy/workouts/tester/", records[0]["local_url"])
+
     def test_workout_archive_image_url_is_tokenized(self) -> None:
         url = BRIDGE._workout_archive_image_url(
             "tester_1",
             "halthy/workouts/tester_1/20260401T101112Z_uuid.jpg",
             "abc123",
+            "2026-04-01T10:11:13Z",
         )
         self.assertIn("/api/halthy/workout_image?", url)
         self.assertIn("username=tester_1", url)
         self.assertIn("token=abc123", url)
+        self.assertIn("v=2026-04-01T10%3A11%3A13Z", url)
 
     def test_workout_archive_file_name_uses_timestamp_and_workout_uuid(self) -> None:
         file_name, workout_fingerprint, workout_timestamp, extension = (
@@ -425,6 +448,44 @@ class StatisticsHelpersTests(unittest.TestCase):
         self.assertEqual(start.minute, 0)
         self.assertEqual(start.second, 0)
         self.assertEqual(start.microsecond, 0)
+
+    def test_statistics_candidates_disabled_per_runtime(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester",
+            app_username="Tester",
+            display_name="Tester",
+            statistics_enabled=False,
+        )
+
+        candidates = BRIDGE._statistics_candidates_from_sensor(
+            runtime=runtime,
+            metric_key="heart_rate",
+            metric_name="Heart rate",
+            state=72,
+            unit="bpm",
+            attributes={"measurement_timestamp": "2026-06-19T10:15:00Z"},
+        )
+
+        self.assertEqual(candidates, [])
+
+    def test_statistics_candidate_name_includes_username(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester_1",
+            app_username="Tester 1",
+            display_name="Tester One",
+        )
+
+        candidates = BRIDGE._statistics_candidates_from_sensor(
+            runtime=runtime,
+            metric_key="heart_rate",
+            metric_name="Heart rate",
+            state=72,
+            unit="bpm",
+            attributes={"measurement_timestamp": "2026-06-19T10:15:00Z"},
+        )
+
+        self.assertEqual(candidates[0]["name"], "Heart rate (Tester 1)")
+        self.assertEqual(candidates[0]["statistic_id"], "halthy:tester_1_heart_rate")
 
     def test_statistics_metadata_includes_unit_class(self) -> None:
         statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
