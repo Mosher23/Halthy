@@ -371,6 +371,21 @@ class StatisticsHelpersTests(unittest.TestCase):
                     "workout_type": "Walking",
                     "workout_distance_m": 1234.5,
                     "workout_duration_s": 1800,
+                    "avg_speed_mps": 0.69,
+                    "highest_speed_mps": 1.4,
+                    "lowest_speed_mps": 0.3,
+                    "avg_heart_rate_bpm": 122,
+                    "lowest_heart_rate_bpm": 92,
+                    "highest_heart_rate_bpm": 151,
+                    "cadence_spm": 104,
+                    "power_w": 180,
+                    "respiratory_rate_brpm": 18,
+                    "workout_elevation_gain_m": 42,
+                    "highest_altitude_m": 120,
+                    "lowest_altitude_m": 78,
+                    "total_flights_climbed": 5,
+                    "weather_temperature_c": 12.4,
+                    "weather_humidity_percent": 71,
                     "ignored_route_payload": [{"lat": 1}],
                 },
             )
@@ -380,6 +395,21 @@ class StatisticsHelpersTests(unittest.TestCase):
             self.assertEqual(records[0]["title"], "Walking")
             self.assertEqual(records[0]["workout_distance_m"], 1234.5)
             self.assertEqual(records[0]["workout_duration_s"], 1800)
+            self.assertEqual(records[0]["avg_speed_mps"], 0.69)
+            self.assertEqual(records[0]["highest_speed_mps"], 1.4)
+            self.assertEqual(records[0]["lowest_speed_mps"], 0.3)
+            self.assertEqual(records[0]["avg_heart_rate_bpm"], 122)
+            self.assertEqual(records[0]["lowest_heart_rate_bpm"], 92)
+            self.assertEqual(records[0]["highest_heart_rate_bpm"], 151)
+            self.assertEqual(records[0]["cadence_spm"], 104)
+            self.assertEqual(records[0]["power_w"], 180)
+            self.assertEqual(records[0]["respiratory_rate_brpm"], 18)
+            self.assertEqual(records[0]["workout_elevation_gain_m"], 42)
+            self.assertEqual(records[0]["highest_altitude_m"], 120)
+            self.assertEqual(records[0]["lowest_altitude_m"], 78)
+            self.assertEqual(records[0]["total_flights_climbed"], 5)
+            self.assertEqual(records[0]["weather_temperature_c"], 12.4)
+            self.assertEqual(records[0]["weather_humidity_percent"], 71)
             self.assertNotIn("ignored_route_payload", records[0])
 
     def test_workout_archive_file_name_uses_timestamp_fallback_key(self) -> None:

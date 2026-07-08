@@ -9,6 +9,13 @@ Home Assistant custom integration for the Halthy app.
 Halthy is a peer-to-peer bridge between iPhone HealthKit data and Home Assistant.
 The app talks directly to your Home Assistant instance. There is no external Halthy cloud relay for metric processing.
 
+## Privacy and Review Information
+
+- Privacy policy: [`../PRIVACY.md`](../PRIVACY.md)
+- App Store review notes: [`../APP_REVIEW_NOTES.md`](../APP_REVIEW_NOTES.md)
+
+Halthy does not operate a central backend. Health, workout, and route data are sent only to user-configured destinations such as Home Assistant and optional InfluxDB. The iOS app stores access tokens in Keychain and uses HealthKit permissions only for selected app functionality.
+
 ## ✨ Features
 
 - Direct push from iPhone to Home Assistant via `POST /api/halthy/push`

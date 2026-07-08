@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "Configura un nome utente per questa voce Halthy.",
+        "data": {
+          "app_username": "Nome utente",
+          "name": "Nome visualizzato (opzionale)",
+          "statistics_enabled": "Importa statistiche storiche"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Inserisci un nome utente valido."
+    },
+    "abort": {
+      "already_configured": "Questo nome utente e gia configurato."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Halthy",
+        "description": "Aggiorna nome utente, nome visualizzato, unita e comportamento del registro attivita per questa voce Halthy.",
+        "data": {
+          "app_username": "Nome utente",
+          "name": "Nome visualizzato (opzionale)",
+          "temperature_unit": "Unita temperatura",
+          "activity_log_mode": "Modalita registro attivita",
+          "statistics_enabled": "Importa statistiche storiche"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Inserisci un nome utente valido.",
+      "already_configured": "Questo nome utente e gia configurato."
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "Configureer een gebruikersnaam voor deze Halthy-vermelding.",
+        "data": {
+          "app_username": "Gebruikersnaam",
+          "name": "Weergavenaam (optioneel)",
+          "statistics_enabled": "Historische statistieken importeren"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Voer een geldige gebruikersnaam in."
+    },
+    "abort": {
+      "already_configured": "Deze gebruikersnaam is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Halthy-opties",
+        "description": "Werk de gebruikersnaam, weergavenaam, eenheden en activiteitlogboekinstellingen voor deze Halthy-vermelding bij.",
+        "data": {
+          "app_username": "Gebruikersnaam",
+          "name": "Weergavenaam (optioneel)",
+          "temperature_unit": "Temperatuureenheid",
+          "activity_log_mode": "Activiteitlogboekmodus",
+          "statistics_enabled": "Historische statistieken importeren"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Voer een geldige gebruikersnaam in.",
+      "already_configured": "Deze gebruikersnaam is al geconfigureerd."
+    }
+  }
+}

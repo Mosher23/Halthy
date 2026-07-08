@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "Configure um nome de usuario para esta entrada do Halthy.",
+        "data": {
+          "app_username": "Nome de usuario",
+          "name": "Nome de exibicao (opcional)",
+          "statistics_enabled": "Importar estatisticas historicas"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Digite um nome de usuario valido."
+    },
+    "abort": {
+      "already_configured": "Este nome de usuario ja esta configurado."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcoes do Halthy",
+        "description": "Atualize o nome de usuario, nome de exibicao, unidades e comportamento do log de atividades para esta entrada do Halthy.",
+        "data": {
+          "app_username": "Nome de usuario",
+          "name": "Nome de exibicao (opcional)",
+          "temperature_unit": "Unidade de temperatura",
+          "activity_log_mode": "Modo do log de atividades",
+          "statistics_enabled": "Importar estatisticas historicas"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Digite um nome de usuario valido.",
+      "already_configured": "Este nome de usuario ja esta configurado."
+    }
+  }
+}

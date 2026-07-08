@@ -317,18 +317,6 @@ class HalthyWorkoutCard extends HTMLElement {
       .calendar-inline-icon {
         --mdc-icon-size: 29px;
       }
-      .chips {
-        margin-top: 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-      .chip {
-        padding: 2px 8px;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        background: rgba(127, 127, 127, 0.15);
-      }
       .calendar-btn {
         margin-top: 12px;
         padding: 8px 12px;
@@ -462,6 +450,82 @@ class HalthyWorkoutCard extends HTMLElement {
       }
       .selected-card .thumb-wrap {
         border-radius: 16px;
+      }
+      .workout-details {
+        margin-top: 12px;
+        display: grid;
+        gap: 12px;
+      }
+      .detail-section {
+        border: 1px solid var(--divider-color);
+        border-radius: 14px;
+        padding: 12px;
+        background: rgba(127, 127, 127, 0.07);
+      }
+      .detail-title {
+        margin-bottom: 10px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: var(--secondary-text-color);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+        gap: 8px;
+      }
+      .metric-tile {
+        min-width: 0;
+        padding: 10px;
+        border-radius: 12px;
+        background: var(--card-background-color, #fff);
+      }
+      .metric-label {
+        color: var(--secondary-text-color);
+        font-size: 0.75rem;
+        line-height: 1.2;
+      }
+      .metric-value {
+        margin-top: 4px;
+        font-weight: 700;
+        line-height: 1.25;
+        overflow-wrap: anywhere;
+      }
+      .zone-bars {
+        display: grid;
+        gap: 8px;
+      }
+      .zone-bar {
+        height: 14px;
+        display: flex;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(127, 127, 127, 0.16);
+      }
+      .zone-segment {
+        min-width: 2px;
+      }
+      .zone-segment.hr-0 { background: #4cc9f0; }
+      .zone-segment.hr-1 { background: #43aa8b; }
+      .zone-segment.hr-2 { background: #f9c74f; }
+      .zone-segment.hr-3 { background: #f9844a; }
+      .zone-segment.hr-4 { background: #f94144; }
+      .zone-segment.power-0 { background: #90be6d; }
+      .zone-segment.power-1 { background: #43aa8b; }
+      .zone-segment.power-2 { background: #577590; }
+      .zone-segment.power-3 { background: #f8961e; }
+      .zone-segment.power-4 { background: #f3722c; }
+      .zone-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .zone-pill {
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(127, 127, 127, 0.13);
+        font-size: 0.76rem;
       }
       .workout-strip {
         display: flex;
@@ -814,6 +878,7 @@ class HalthyWorkoutCard extends HTMLElement {
       dateLabel: timestamp ? this._formatDate(timestamp) : this._formatDate(dateSource),
       image,
       chips: this._chipsFromWorkout(item),
+      details: this._workoutDetailsFromItem(item),
       entity_id: stateObj.entity_id,
       archiveKey: this._archiveKeyFromWorkoutItem(item, image),
       workoutId: this._workoutIdFromItem(item),
@@ -858,6 +923,7 @@ class HalthyWorkoutCard extends HTMLElement {
       dateLabel: timestamp ? this._formatDate(timestamp) : this._formatDate(dateSource),
       image,
       chips: this._chipsFromWorkout(attrs),
+      details: this._workoutDetailsFromItem(attrs),
       entity_id: stateObj.entity_id,
       archiveKey: this._archiveKeyFromWorkoutItem(attrs, image),
       workoutId: this._workoutIdFromItem(attrs),
@@ -967,10 +1033,43 @@ class HalthyWorkoutCard extends HTMLElement {
       dateLabel: this._firstString(existing.dateLabel, incoming.dateLabel),
       image: this._firstString(existing.image, incoming.image),
       chips: Array.isArray(existing.chips) && existing.chips.length ? existing.chips : incoming.chips || [],
+      details: this._mergeWorkoutDetails(existing.details, incoming.details),
       entity_id: this._firstString(existing.entity_id, incoming.entity_id),
       archiveKey: this._firstString(existing.archiveKey, incoming.archiveKey),
       workoutId: this._firstString(existing.workoutId, incoming.workoutId),
     };
+  }
+
+  _mergeWorkoutDetails(existing, incoming) {
+    const existingDetails = existing && typeof existing === "object" ? existing : {};
+    const incomingDetails = incoming && typeof incoming === "object" ? incoming : {};
+    return {
+      ...incomingDetails,
+      ...existingDetails,
+      summary: this._mergeMetricLists(existingDetails.summary, incomingDetails.summary),
+      heart: this._mergeMetricLists(existingDetails.heart, incomingDetails.heart),
+      speed: this._mergeMetricLists(existingDetails.speed, incomingDetails.speed),
+      elevation: this._mergeMetricLists(existingDetails.elevation, incomingDetails.elevation),
+      speedRange: existingDetails.speedRange || incomingDetails.speedRange || null,
+      heartZones: Array.isArray(existingDetails.heartZones) && existingDetails.heartZones.length
+        ? existingDetails.heartZones
+        : incomingDetails.heartZones || [],
+      powerZones: Array.isArray(existingDetails.powerZones) && existingDetails.powerZones.length
+        ? existingDetails.powerZones
+        : incomingDetails.powerZones || [],
+      hasData: Boolean(existingDetails.hasData || incomingDetails.hasData),
+    };
+  }
+
+  _mergeMetricLists(existing, incoming) {
+    const merged = new Map();
+    for (const metric of [...(incoming || []), ...(existing || [])]) {
+      if (!metric || !metric.label || !metric.value) {
+        continue;
+      }
+      merged.set(metric.label, metric);
+    }
+    return [...merged.values()];
   }
 
   _betterWorkoutTitle(existingTitle, incomingTitle) {
@@ -1067,9 +1166,6 @@ class HalthyWorkoutCard extends HTMLElement {
       `
       : "";
 
-    const chips = workout.chips
-      .map((chip) => `<span class="chip">${this._escape(chip)}</span>`)
-      .join("");
     const showCalendarButton = options.showCalendarButton === true;
     const calendarDisabled = options.calendarDisabled === true;
     const calendarButtonHtml = showCalendarButton
@@ -1098,7 +1194,6 @@ class HalthyWorkoutCard extends HTMLElement {
         <div class="thumb-wrap">${imageHtml}${navHtml}</div>
         <div class="meta">
           ${headlineHtml}
-          ${chips ? `<div class="chips">${chips}</div>` : ""}
         </div>
       </article>
     `;
@@ -1124,6 +1219,7 @@ class HalthyWorkoutCard extends HTMLElement {
     const selectedHtml = selectedWorkout
       ? `
         ${this._renderWorkoutCard(selectedWorkout, "selected-card")}
+        ${this._renderWorkoutDetails(selectedWorkout)}
         ${selectorHtml}
       `
       : `<div class="state">${this._escape(selectedMessage)}</div>`;
@@ -1224,6 +1320,97 @@ class HalthyWorkoutCard extends HTMLElement {
     `;
   }
 
+  _renderWorkoutDetails(workout) {
+    const details = workout?.details && typeof workout.details === "object" ? workout.details : null;
+    if (!details || !details.hasData) {
+      return `
+        <div class="workout-details">
+          <div class="detail-section">
+            <div class="detail-title">Workout details</div>
+            <div class="state">No detailed workout metadata is available for this archived workout.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    const sections = [
+      this._renderMetricSection("Elevation & environment", details.elevation),
+      this._renderZoneSection("Heart-rate zones", details.heartZones, "hr"),
+      this._renderZoneSection("Power zones", details.powerZones, "power"),
+    ].filter(Boolean);
+
+    if (!sections.length) {
+      return "";
+    }
+
+    return `<div class="workout-details">${sections.join("")}</div>`;
+  }
+
+  _renderMetricSection(title, metrics) {
+    const visibleMetrics = Array.isArray(metrics)
+      ? metrics.filter((metric) => metric && metric.label && metric.value)
+      : [];
+    if (!visibleMetrics.length) {
+      return "";
+    }
+
+    return `
+      <section class="detail-section">
+        <div class="detail-title">${this._escape(title)}</div>
+        <div class="metric-grid">
+          ${visibleMetrics.map((metric) => this._renderMetricTile(metric)).join("")}
+        </div>
+      </section>
+    `;
+  }
+
+  _renderMetricTile(metric) {
+    return `
+      <div class="metric-tile">
+        <div class="metric-label">${this._escape(metric.label)}</div>
+        <div class="metric-value">${this._escape(metric.value)}</div>
+      </div>
+    `;
+  }
+
+  _renderZoneSection(title, zones, classPrefix) {
+    const normalizedZones = this._normalizedZones(zones);
+    if (!normalizedZones.length) {
+      return "";
+    }
+
+    const totalDuration = normalizedZones.reduce((sum, zone) => sum + zone.duration, 0);
+    if (totalDuration <= 0) {
+      return "";
+    }
+
+    return `
+      <section class="detail-section">
+        <div class="detail-title">${this._escape(title)}</div>
+        <div class="zone-bars">
+          <div class="zone-bar">
+            ${normalizedZones
+              .map((zone, index) => {
+                const width = Math.max(2, (zone.duration / totalDuration) * 100);
+                return `<span class="zone-segment ${classPrefix}-${index % 5}" style="width: ${width.toFixed(2)}%;"></span>`;
+              })
+              .join("")}
+          </div>
+          <div class="zone-legend">
+            ${normalizedZones
+              .map(
+                (zone) =>
+                  `<span class="zone-pill">${this._escape(zone.label)} ${this._escape(
+                    this._formatShortDuration(zone.duration)
+                  )}</span>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   _clampedWorkoutIndex(workouts) {
     const count = Array.isArray(workouts) ? workouts.length : 0;
     if (count <= 0) {
@@ -1276,7 +1463,226 @@ class HalthyWorkoutCard extends HTMLElement {
       chips.push(powerZone);
     }
 
+    chips.push(...this._weatherChipsFromWorkout(item));
+
     return chips;
+  }
+
+  _workoutDetailsFromItem(item) {
+    if (!item || typeof item !== "object") {
+      return { hasData: false };
+    }
+
+    const distanceM = this._toNumber(item.workout_distance_m ?? item.distance_m ?? item.distance);
+    const durationS = this._toNumber(
+      item.workout_duration_s ?? item.duration_s ?? item.duration_seconds ?? item.duration
+    );
+    const activeEnergyKcal = this._toNumber(
+      item.workout_active_energy_kcal ?? item.active_energy_kcal ?? item.energy_kcal
+    );
+    const flights = this._toNumber(
+      item.total_flights_climbed ?? item.workout_total_flights_climbed ?? item.flights_climbed ?? item.flights
+    );
+    const avgHeartRate = this._toNumber(item.workout_avg_heart_rate_bpm ?? item.avg_heart_rate_bpm);
+    const minHeartRate = this._toNumber(item.lowest_heart_rate_bpm ?? item.min_heart_rate_bpm);
+    const maxHeartRate = this._toNumber(item.highest_heart_rate_bpm ?? item.max_heart_rate_bpm);
+    const respiratoryRate = this._toNumber(
+      item.respiratory_rate_brpm ?? item.avg_respiratory_rate_brpm ?? item.respiratory_rate
+    );
+    const powerW = this._toNumber(item.power_w ?? item.avg_power_w ?? item.power);
+    const avgSpeedMps =
+      this._toNumber(item.avg_speed_mps ?? item.workout_avg_speed_mps ?? item.average_speed_mps) ??
+      (distanceM !== null && durationS !== null && distanceM > 0 && durationS > 0 ? distanceM / durationS : null);
+    const minSpeedMps = this._toNumber(item.lowest_speed_mps ?? item.min_speed_mps ?? item.lowest_speed);
+    const maxSpeedMps = this._toNumber(item.highest_speed_mps ?? item.max_speed_mps ?? item.highest_speed);
+    const cadenceSpm = this._toNumber(item.cadence_spm ?? item.avg_cadence_spm ?? item.cadence);
+    const elevationGainM = this._toNumber(item.workout_elevation_gain_m ?? item.elevation_gain_m);
+    const highestAltitudeM = this._toNumber(item.highest_altitude_m ?? item.max_altitude_m ?? item.highest_altitude);
+    const lowestAltitudeM = this._toNumber(item.lowest_altitude_m ?? item.min_altitude_m ?? item.lowest_altitude);
+    const temperatureC = this._toNumber(
+      item.weather_temperature_c ?? item.weather_temperature_celsius ?? item.temperature_c ?? item.temperature_celsius
+    );
+    const humidityPercent = this._toNumber(
+      item.weather_humidity_percent ?? item.humidity_percent ?? item.weather_humidity
+    );
+    const weatherCondition = this._firstString(
+      item.weather_condition,
+      this._weatherConditionName(this._toNumber(item.weather_condition_raw))
+    );
+
+    const speedRangeMetrics = [
+      this._metric("Lowest", this._formatSpeed(minSpeedMps)),
+      this._metric("Average", this._formatSpeed(avgSpeedMps)),
+      this._metric("Highest", this._formatSpeed(maxSpeedMps)),
+    ].filter(Boolean);
+
+    const summary = [
+      this._metric("Duration", this._formatDuration(durationS)),
+      this._metric("Distance", this._formatDistance(distanceM)),
+      this._metric("Active energy", this._formatRoundedUnit(activeEnergyKcal, "kcal")),
+      this._metric("Flights climbed", this._formatRoundedUnit(flights, "floors")),
+    ].filter(Boolean);
+
+    const heart = [
+      this._metric("Avg heart rate", this._formatRoundedUnit(avgHeartRate, "bpm")),
+      this._metric("Lowest heart rate", this._formatRoundedUnit(minHeartRate, "bpm")),
+      this._metric("Highest heart rate", this._formatRoundedUnit(maxHeartRate, "bpm")),
+      this._metric("Respiratory rate", this._formatRoundedUnit(respiratoryRate, "br/min")),
+      this._metric("Power", this._formatRoundedUnit(powerW, "W")),
+    ].filter(Boolean);
+
+    const speed = [
+      this._metric("Average speed", this._formatSpeed(avgSpeedMps)),
+      this._metric("Highest speed", this._formatSpeed(maxSpeedMps)),
+      this._metric("Lowest speed", this._formatSpeed(minSpeedMps)),
+      this._metric("Cadence", this._formatRoundedUnit(cadenceSpm, "spm")),
+    ].filter(Boolean);
+
+    const elevation = [
+      this._metric("Elevation gain", this._formatRoundedUnit(elevationGainM, "m")),
+      this._metric("Highest altitude", this._formatRoundedUnit(highestAltitudeM, "m")),
+      this._metric("Lowest altitude", this._formatRoundedUnit(lowestAltitudeM, "m")),
+      this._metric("Weather", weatherCondition),
+      this._metric("Temperature", this._formatTemperature(temperatureC)),
+      this._metric("Humidity", this._formatPercent(humidityPercent)),
+    ].filter(Boolean);
+
+    const heartZones = this._firstArray(item.heart_rate_zones, item.workout_heart_rate_zones);
+    const powerZones = this._firstArray(item.cycling_power_zones, item.power_zones, item.workout_power_zones);
+    const hasData = Boolean(
+      summary.length ||
+        heart.length ||
+        speed.length ||
+        elevation.length ||
+        this._normalizedZones(heartZones).length ||
+        this._normalizedZones(powerZones).length
+    );
+
+    return {
+      summary,
+      heart,
+      speed,
+      elevation,
+      speedRange: speedRangeMetrics.length
+        ? {
+            metrics: speedRangeMetrics,
+            labels: new Set(["Lowest speed", "Average speed", "Highest speed"]),
+          }
+        : null,
+      heartZones,
+      powerZones,
+      hasData,
+    };
+  }
+
+  _metric(label, value) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    if (!normalized) {
+      return null;
+    }
+    return { label, value: normalized };
+  }
+
+  _firstArray(...values) {
+    for (const value of values) {
+      if (Array.isArray(value) && value.length) {
+        return value;
+      }
+    }
+    return [];
+  }
+
+  _normalizedZones(zones) {
+    if (!Array.isArray(zones)) {
+      return [];
+    }
+    return zones
+      .map((zone, index) => {
+        if (!zone || typeof zone !== "object") {
+          return null;
+        }
+        const duration = this._toNumber(zone.duration_s ?? zone.durationSeconds ?? zone.duration);
+        if (duration === null || duration <= 0) {
+          return null;
+        }
+        const zoneNumber = this._toNumber(zone.zone ?? zone.index ?? zone.zoneIndex);
+        const label = zoneNumber !== null ? `Z${Math.round(zoneNumber)}` : `Z${index + 1}`;
+        return { label, duration };
+      })
+      .filter(Boolean);
+  }
+
+  _weatherChipsFromWorkout(item) {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const chips = [];
+    const condition = this._firstString(
+      item.weather_condition,
+      this._weatherConditionName(this._toNumber(item.weather_condition_raw))
+    );
+    if (condition) {
+      chips.push(condition);
+    }
+
+    const temperatureC = this._toNumber(
+      item.weather_temperature_c ??
+        item.weather_temperature_celsius ??
+        item.temperature_c ??
+        item.temperature_celsius
+    );
+    if (temperatureC !== null) {
+      chips.push(`${Math.round(temperatureC)} °C`);
+    }
+
+    const humidityPercent = this._toNumber(
+      item.weather_humidity_percent ??
+        item.humidity_percent ??
+        item.weather_humidity
+    );
+    if (humidityPercent !== null) {
+      const normalizedHumidity = humidityPercent <= 1 ? humidityPercent * 100 : humidityPercent;
+      chips.push(`${Math.round(Math.max(0, Math.min(100, normalizedHumidity)))}% humidity`);
+    }
+
+    return chips;
+  }
+
+  _weatherConditionName(rawValue) {
+    if (rawValue === null) {
+      return "";
+    }
+    const names = {
+      1: "Clear",
+      2: "Fair",
+      3: "Partly cloudy",
+      4: "Mostly cloudy",
+      5: "Cloudy",
+      6: "Foggy",
+      7: "Haze",
+      8: "Windy",
+      9: "Blustery",
+      10: "Smoky",
+      11: "Dust",
+      12: "Snow",
+      13: "Hail",
+      14: "Sleet",
+      15: "Freezing drizzle",
+      16: "Freezing rain",
+      17: "Rain and hail",
+      18: "Rain and snow",
+      19: "Rain and sleet",
+      20: "Snow and sleet",
+      21: "Drizzle",
+      22: "Scattered showers",
+      23: "Showers",
+      24: "Thunderstorms",
+      25: "Tropical storm",
+      26: "Hurricane",
+      27: "Tornado",
+    };
+    return names[Math.round(rawValue)] || "";
   }
 
   _dominantZoneChip(zones, label) {
@@ -1526,6 +1932,7 @@ class HalthyWorkoutCard extends HTMLElement {
       dateLabel,
       image: resolvedImage,
       chips: this._chipsFromWorkout(record),
+      details: this._workoutDetailsFromItem(record),
       entity_id: entityId,
       archiveKey: relativePath,
       workoutId: this._workoutIdFromItem(record),
@@ -1743,6 +2150,7 @@ class HalthyWorkoutCard extends HTMLElement {
       dateLabel,
       image: resolvedImage,
       chips: [],
+      details: this._workoutDetailsFromItem(child),
       entity_id: entityId,
       archiveKey: relativePath,
       workoutId: this._workoutIdFromItem(child),
@@ -2259,6 +2667,66 @@ class HalthyWorkoutCard extends HTMLElement {
     return new Date(date.getFullYear(), date.getMonth(), 1);
   }
 
+  _formatDistance(meters) {
+    if (meters === null || meters === undefined || !Number.isFinite(meters) || meters <= 0) {
+      return "";
+    }
+    if (meters >= 1000) {
+      const km = meters / 1000;
+      return `${km.toFixed(km >= 10 ? 1 : 2)} km`;
+    }
+    return `${Math.round(meters)} m`;
+  }
+
+  _formatDuration(seconds) {
+    if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) {
+      return "";
+    }
+    const totalMinutes = Math.round(seconds / 60);
+    if (totalMinutes < 60) {
+      return `${Math.max(1, totalMinutes)} min`;
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+
+  _formatSpeed(metersPerSecond) {
+    if (
+      metersPerSecond === null ||
+      metersPerSecond === undefined ||
+      !Number.isFinite(metersPerSecond) ||
+      metersPerSecond <= 0
+    ) {
+      return "";
+    }
+    const kmh = metersPerSecond * 3.6;
+    return `${kmh.toFixed(kmh >= 10 ? 1 : 2)} km/h`;
+  }
+
+  _formatRoundedUnit(value, unit) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "";
+    }
+    const rounded = Math.abs(value) >= 10 ? Math.round(value) : Number(value.toFixed(1));
+    return `${rounded} ${unit}`;
+  }
+
+  _formatTemperature(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "";
+    }
+    return `${Math.round(value)} °C`;
+  }
+
+  _formatPercent(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      return "";
+    }
+    const normalized = value <= 1 ? value * 100 : value;
+    return `${Math.round(Math.max(0, Math.min(100, normalized)))}%`;
+  }
+
   _formatDate(value) {
     const parsed = value instanceof Date ? value : this._toDate(value);
     if (!parsed) {
@@ -2331,6 +2799,8 @@ class HalthyWorkoutCard extends HTMLElement {
       this._firstString(attrs.archive_relative_path),
       this._firstString(attrs.archive_local_url),
       this._firstString(attrs.archive_media_source_id),
+      this._workoutDetailSignature(attrs),
+      this._weatherSignature(attrs),
       this._workoutListSignature(rawWorkouts),
       this._firstString(attrs.workout_end, attrs.measurement_timestamp, attrs.last_pushed),
     ].join("|");
@@ -2359,7 +2829,65 @@ class HalthyWorkoutCard extends HTMLElement {
       last.measurement_timestamp,
       last.last_pushed
     );
-    return `${list.length}:${firstToken}:${lastToken}`;
+    return `${list.length}:${firstToken}:${this._workoutDetailSignature(first)}:${lastToken}:${this._workoutDetailSignature(last)}`;
+  }
+
+  _workoutDetailSignature(item) {
+    if (!item || typeof item !== "object") {
+      return "";
+    }
+    return [
+      this._weatherSignature(item),
+      String(item.workout_distance_m ?? item.distance_m ?? item.distance ?? ""),
+      String(item.workout_duration_s ?? item.duration_s ?? item.duration_seconds ?? item.duration ?? ""),
+      String(item.workout_active_energy_kcal ?? item.active_energy_kcal ?? item.energy_kcal ?? ""),
+      String(item.avg_heart_rate_bpm ?? item.workout_avg_heart_rate_bpm ?? ""),
+      String(item.lowest_heart_rate_bpm ?? item.min_heart_rate_bpm ?? ""),
+      String(item.highest_heart_rate_bpm ?? item.max_heart_rate_bpm ?? ""),
+      String(item.avg_speed_mps ?? item.workout_avg_speed_mps ?? item.average_speed_mps ?? ""),
+      String(item.lowest_speed_mps ?? item.min_speed_mps ?? ""),
+      String(item.highest_speed_mps ?? item.max_speed_mps ?? ""),
+      String(item.cadence_spm ?? item.avg_cadence_spm ?? ""),
+      String(item.power_w ?? item.avg_power_w ?? ""),
+      String(item.respiratory_rate_brpm ?? item.avg_respiratory_rate_brpm ?? ""),
+      String(item.workout_elevation_gain_m ?? item.elevation_gain_m ?? ""),
+      String(item.highest_altitude_m ?? item.max_altitude_m ?? ""),
+      String(item.lowest_altitude_m ?? item.min_altitude_m ?? ""),
+      String(item.total_flights_climbed ?? item.workout_total_flights_climbed ?? item.flights_climbed ?? ""),
+      this._zoneSignature(item.heart_rate_zones),
+      this._zoneSignature(item.cycling_power_zones),
+    ].join("|");
+  }
+
+  _zoneSignature(zones) {
+    if (!Array.isArray(zones) || !zones.length) {
+      return "";
+    }
+    return zones
+      .map((zone) => {
+        if (!zone || typeof zone !== "object") {
+          return "";
+        }
+        return [
+          String(zone.zone ?? zone.index ?? ""),
+          String(zone.duration_s ?? zone.durationSeconds ?? zone.duration ?? ""),
+          String(zone.min ?? ""),
+          String(zone.max ?? ""),
+        ].join(":");
+      })
+      .join(",");
+  }
+
+  _weatherSignature(item) {
+    if (!item || typeof item !== "object") {
+      return "";
+    }
+    return [
+      this._firstString(item.weather_condition),
+      String(item.weather_condition_raw ?? ""),
+      String(item.weather_temperature_c ?? item.weather_temperature_celsius ?? ""),
+      String(item.weather_humidity_percent ?? item.weather_humidity ?? ""),
+    ].join(":");
   }
 
   _calendarIcon() {

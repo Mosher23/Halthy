@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "Konfiguriere einen Benutzernamen fuer diesen Halthy-Eintrag.",
+        "data": {
+          "app_username": "Benutzername",
+          "name": "Anzeigename (optional)",
+          "statistics_enabled": "Historische Statistiken importieren"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Gib einen gueltigen Benutzernamen ein."
+    },
+    "abort": {
+      "already_configured": "Dieser Benutzername ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Halthy-Optionen",
+        "description": "Aktualisiere Benutzername, Anzeigename, Einheiten und Aktivitaetsprotokoll fuer diesen Halthy-Eintrag.",
+        "data": {
+          "app_username": "Benutzername",
+          "name": "Anzeigename (optional)",
+          "temperature_unit": "Temperatureinheit",
+          "activity_log_mode": "Aktivitaetsprotokollmodus",
+          "statistics_enabled": "Historische Statistiken importieren"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "Gib einen gueltigen Benutzernamen ein.",
+      "already_configured": "Dieser Benutzername ist bereits konfiguriert."
+    }
+  }
+}

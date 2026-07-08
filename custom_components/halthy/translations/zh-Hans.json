@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "为此 Halthy 条目配置一个用户名。",
+        "data": {
+          "app_username": "用户名",
+          "name": "显示名称（可选）",
+          "statistics_enabled": "导入历史统计"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "请输入有效的用户名。"
+    },
+    "abort": {
+      "already_configured": "此用户名已配置。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Halthy 选项",
+        "description": "更新此 Halthy 条目的用户名、显示名称、单位和活动日志行为。",
+        "data": {
+          "app_username": "用户名",
+          "name": "显示名称（可选）",
+          "temperature_unit": "温度单位",
+          "activity_log_mode": "活动日志模式",
+          "statistics_enabled": "导入历史统计"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "请输入有效的用户名。",
+      "already_configured": "此用户名已配置。"
+    }
+  }
+}

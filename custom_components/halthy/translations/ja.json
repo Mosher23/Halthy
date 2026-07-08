@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Halthy",
+        "description": "このHalthyエントリ用のユーザー名を1つ設定します。",
+        "data": {
+          "app_username": "ユーザー名",
+          "name": "表示名（任意）",
+          "statistics_enabled": "履歴統計をインポート"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "有効なユーザー名を入力してください。"
+    },
+    "abort": {
+      "already_configured": "このユーザー名はすでに設定されています。"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Halthyオプション",
+        "description": "このHalthyエントリのユーザー名、表示名、単位、アクティビティログ動作を更新します。",
+        "data": {
+          "app_username": "ユーザー名",
+          "name": "表示名（任意）",
+          "temperature_unit": "温度単位",
+          "activity_log_mode": "アクティビティログモード",
+          "statistics_enabled": "履歴統計をインポート"
+        }
+      }
+    },
+    "error": {
+      "invalid_username": "有効なユーザー名を入力してください。",
+      "already_configured": "このユーザー名はすでに設定されています。"
+    }
+  }
+}
