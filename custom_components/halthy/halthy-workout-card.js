@@ -832,14 +832,14 @@ class HalthyWorkoutCard extends HTMLElement {
       )
     );
 
-    const resolvedTitle = this._firstString(
+    const resolvedTitle = this._formatWorkoutTitle(this._firstString(
       title,
       item.workout_type,
       item.workout_activity_type,
       item.activity_type,
       item.type,
       "Workout"
-    );
+    ));
 
     const dateSource = this._firstPresent(
       item.workout_end,
@@ -906,12 +906,12 @@ class HalthyWorkoutCard extends HTMLElement {
       return null;
     }
 
-    const title = this._firstString(
+    const title = this._formatWorkoutTitle(this._firstString(
       attrs.workout_type,
       attrs.workout_activity_type,
       stateObj.state,
       "Workout"
-    );
+    ));
 
     const dateSource = this._firstPresent(attrs.workout_end, attrs.measurement_timestamp, attrs.last_pushed);
     const timestamp = this._toDate(dateSource);
@@ -1073,8 +1073,8 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _betterWorkoutTitle(existingTitle, incomingTitle) {
-    const existing = this._firstString(existingTitle);
-    const incoming = this._firstString(incomingTitle);
+    const existing = this._formatWorkoutTitle(existingTitle);
+    const incoming = this._formatWorkoutTitle(incomingTitle);
     if (this._isGenericWorkoutTitle(existing) && !this._isGenericWorkoutTitle(incoming)) {
       return incoming;
     }
@@ -1082,6 +1082,47 @@ class HalthyWorkoutCard extends HTMLElement {
       return existing;
     }
     return incoming || existing || "Workout";
+  }
+
+  _formatWorkoutTitle(title) {
+    const rawTitle = this._firstString(title);
+    if (!rawTitle) {
+      return "";
+    }
+    const cleaned = rawTitle
+      .replace(/^HKWorkoutActivityType/i, "")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!cleaned) {
+      return "";
+    }
+    return cleaned
+      .split(" ")
+      .map((word) => {
+        if (/^[A-Z0-9]+$/.test(word)) {
+          return word;
+        }
+        return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+      })
+      .join(" ");
+  }
+
+  _workoutDisplayTitle(workout) {
+    if (!workout || typeof workout !== "object") {
+      return "Workout";
+    }
+    return this._formatWorkoutTitle(
+      this._firstString(
+        workout.title,
+        workout.workout_type,
+        workout.workout_activity_type,
+        workout.activity_type,
+        workout.workout_kind,
+        workout.type
+      )
+    ) || "Workout";
   }
 
   _isGenericWorkoutTitle(title) {
@@ -1129,10 +1170,9 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _renderWorkoutCard(workout, extraClass = "", options = {}) {
+    const title = this._workoutDisplayTitle(workout);
     const imageHtml = workout.image
-      ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(
-          workout.title || "Workout"
-        )}" />`
+      ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(title)}" />`
       : `<div class="placeholder">WK</div>`;
     const showWorkoutNavigation = options.showWorkoutNavigation === true;
     const navHtml = showWorkoutNavigation
@@ -1182,7 +1222,7 @@ class HalthyWorkoutCard extends HTMLElement {
     const headlineHtml = `
       <div class="headline-row">
         <div class="headline-main">
-          <div class="name">${this._escape(workout.title || "Workout")}</div>
+          <div class="name">${this._escape(title)}</div>
           ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : ""}
         </div>
         ${calendarButtonHtml}
@@ -1300,20 +1340,21 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _renderWorkoutSelectorItem(workout, index, selected) {
+    const title = this._workoutDisplayTitle(workout);
     const imageHtml = workout.image
-      ? `<img src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(workout.title || "Workout")}" loading="lazy" />`
+      ? `<img src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(title)}" loading="lazy" />`
       : `<div class="workout-tab-placeholder">No image</div>`;
     const timeLabel = this._formatTime(workout.timestamp) || workout.dateLabel || "";
     return `
       <button
         class="workout-tab ${selected ? "selected" : ""}"
         data-workout-index="${index}"
-        aria-label="${this._escapeAttr(workout.title || "Workout")}${timeLabel ? ` ${this._escapeAttr(timeLabel)}` : ""}"
+        aria-label="${this._escapeAttr(title)}${timeLabel ? ` ${this._escapeAttr(timeLabel)}` : ""}"
         ${selected ? 'aria-current="true"' : ""}
       >
         <div class="workout-tab-thumb">${imageHtml}</div>
         <div class="workout-tab-meta">
-          <div class="workout-tab-title">${this._escape(workout.title || "Workout")}</div>
+          <div class="workout-tab-title">${this._escape(title)}</div>
           ${timeLabel ? `<div class="workout-tab-time">${this._escape(timeLabel)}</div>` : ""}
         </div>
       </button>
@@ -1334,7 +1375,6 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     const sections = [
-      this._renderMetricSection("Elevation & environment", details.elevation),
       this._renderZoneSection("Heart-rate zones", details.heartZones, "hr"),
       this._renderZoneSection("Power zones", details.powerZones, "power"),
     ].filter(Boolean);
@@ -1917,7 +1957,7 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     return {
-      title: this._firstString(
+      title: this._formatWorkoutTitle(this._firstString(
         record.workout_type,
         record.workout_activity_type,
         record.activity_type,
@@ -1926,7 +1966,7 @@ class HalthyWorkoutCard extends HTMLElement {
         record.title,
         record.name,
         "Workout"
-      ),
+      )),
       timestamp,
       dayKey,
       dateLabel,
@@ -2144,7 +2184,16 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     return {
-      title: "Workout",
+      title: this._formatWorkoutTitle(
+        this._firstString(
+          child.workout_type,
+          child.workout_activity_type,
+          child.activity_type,
+          child.workout_kind,
+          child.type,
+          "Workout"
+        )
+      ),
       timestamp,
       dayKey,
       dateLabel,
