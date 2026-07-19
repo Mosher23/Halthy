@@ -111,6 +111,9 @@ class HalthyWorkoutCard extends HTMLElement {
     this._apiLoadSeq = 0;
     this._apiArchiveUser = "";
     this._imageObjectUrls = new Set();
+    this._resolvedImageUrls = new Map();
+    this._imageLoadsInProgress = new Set();
+    this._maxResolvedImageUrls = 24;
     this._lastStateSignature = "";
     this._mediaArchiveFoldersKey = "";
   }
@@ -147,6 +150,7 @@ class HalthyWorkoutCard extends HTMLElement {
     this._apiArchiveUser = "";
     this._apiWorkoutsLoaded = false;
     this._apiArchiveWorkouts = [];
+    this._revokeImageObjectUrls();
     this._selectedWorkoutIndex = 0;
     this._currentWorkoutIndex = 0;
 
@@ -634,6 +638,7 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     const currentWorkout = workouts[currentIndex] || null;
+    this._ensureWorkoutImageLoaded(currentWorkout);
     const latestHtml = currentWorkout
       ? this._renderWorkoutCard(currentWorkout, "latest-card-click", {
           showCalendarButton: true,
@@ -1032,6 +1037,7 @@ class HalthyWorkoutCard extends HTMLElement {
       dayKey,
       dateLabel: this._firstString(existing.dateLabel, incoming.dateLabel),
       image: this._firstString(existing.image, incoming.image),
+      imageSource: this._firstString(existing.imageSource, incoming.imageSource),
       chips: Array.isArray(existing.chips) && existing.chips.length ? existing.chips : incoming.chips || [],
       details: this._mergeWorkoutDetails(existing.details, incoming.details),
       entity_id: this._firstString(existing.entity_id, incoming.entity_id),
@@ -1171,8 +1177,9 @@ class HalthyWorkoutCard extends HTMLElement {
 
   _renderWorkoutCard(workout, extraClass = "", options = {}) {
     const title = this._workoutDisplayTitle(workout);
-    const imageHtml = workout.image
-      ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(title)}" />`
+    const resolvedImage = this._resolvedWorkoutImage(workout);
+    const imageHtml = resolvedImage
+      ? `<img class="thumb" loading="lazy" src="${this._escapeAttr(resolvedImage)}" alt="${this._escapeAttr(title)}" />`
       : `<div class="placeholder">WK</div>`;
     const showWorkoutNavigation = options.showWorkoutNavigation === true;
     const navHtml = showWorkoutNavigation
@@ -1250,6 +1257,7 @@ class HalthyWorkoutCard extends HTMLElement {
 
     const calendarGrid = this._renderCalendarGrid(workoutsByDay);
     const selectedWorkouts = this._selectedDayKey ? workoutsByDay.get(this._selectedDayKey) || [] : [];
+    selectedWorkouts.forEach((workout) => this._ensureWorkoutImageLoaded(workout));
     const selectedIndex = this._clampedWorkoutIndex(selectedWorkouts);
     const selectedWorkout = selectedWorkouts[selectedIndex] || null;
     const selectedMessage = this._config.calendar_empty_day_message;
@@ -1341,8 +1349,9 @@ class HalthyWorkoutCard extends HTMLElement {
 
   _renderWorkoutSelectorItem(workout, index, selected) {
     const title = this._workoutDisplayTitle(workout);
-    const imageHtml = workout.image
-      ? `<img src="${this._escapeAttr(workout.image)}" alt="${this._escapeAttr(title)}" loading="lazy" />`
+    const resolvedImage = this._resolvedWorkoutImage(workout);
+    const imageHtml = resolvedImage
+      ? `<img src="${this._escapeAttr(resolvedImage)}" alt="${this._escapeAttr(title)}" loading="lazy" />`
       : `<div class="workout-tab-placeholder">No image</div>`;
     const timeLabel = this._formatTime(workout.timestamp) || workout.dateLabel || "";
     return `
@@ -1768,7 +1777,13 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     const attrs = stateObj?.attributes || {};
-    this._ensureArchiveApiLoaded(stateObj, attrs);
+    const archiveApiAvailable = this._ensureArchiveApiLoaded(stateObj, attrs);
+    if (
+      archiveApiAvailable &&
+      (this._apiLoading || !this._apiWorkoutsLoaded || this._apiArchiveWorkouts.length > 0)
+    ) {
+      return;
+    }
     if (typeof this._hass.callWS !== "function") {
       return;
     }
@@ -1812,7 +1827,7 @@ class HalthyWorkoutCard extends HTMLElement {
 
   _ensureArchiveApiLoaded(stateObj, attrs = {}) {
     if (!this._config.use_media_archive) {
-      return;
+      return false;
     }
 
     const resolvedEntityId = stateObj?.entity_id || this._resolvedEntityId() || _entityFromUser(this._config?.user || "");
@@ -1822,7 +1837,7 @@ class HalthyWorkoutCard extends HTMLElement {
       _sanitizeIdentifier(this._firstString(attrs.username))
     );
     if (!user) {
-      return;
+      return false;
     }
 
     const archiveFileName = this._firstString(attrs.archive_file_name);
@@ -1832,11 +1847,12 @@ class HalthyWorkoutCard extends HTMLElement {
     }
     const userChanged = user !== this._apiArchiveUser;
     if (!userChanged && !hasNewLatestFile && (this._apiLoading || this._apiWorkoutsLoaded)) {
-      return;
+      return true;
     }
 
     this._apiArchiveUser = user;
     void this._loadArchiveApiWorkouts(user, resolvedEntityId);
+    return true;
   }
 
   async _loadArchiveApiWorkouts(user, entityId) {
@@ -1849,9 +1865,9 @@ class HalthyWorkoutCard extends HTMLElement {
       const endpoint = `/api/halthy/workouts?username=${encodeURIComponent(user)}&limit=300`;
       const payload = await this._fetchAuthedJson(endpoint);
       const records = Array.isArray(payload?.workouts) ? payload.workouts : [];
-      const workouts = (
-        await Promise.all(records.map((record) => this._workoutFromArchiveApiItemAsync(record, entityId)))
-      ).filter((item) => item !== null);
+      const workouts = records
+        .map((record) => this._workoutFromArchiveApiItem(record, entityId))
+        .filter((item) => item !== null);
 
       this._sortWorkouts(workouts);
       if (loadSeq !== this._apiLoadSeq) {
@@ -1924,7 +1940,7 @@ class HalthyWorkoutCard extends HTMLElement {
     }
   }
 
-  async _workoutFromArchiveApiItemAsync(record, entityId) {
+  _workoutFromArchiveApiItem(record, entityId) {
     if (!record || typeof record !== "object") {
       return null;
     }
@@ -1947,12 +1963,10 @@ class HalthyWorkoutCard extends HTMLElement {
           .join("/")}`
       : "";
     const mediaSourceId = this._firstString(record.media_source_id);
-    const resolvedImage = imageApiUrl
-      ? this._normalizeImageUrl(imageApiUrl)
-      : await this._authSafeImageUrl(
-          this._normalizeImageUrl(this._firstString(localUrlFromRecord, fallbackLocalUrl, mediaSourceId))
-        );
-    if (!resolvedImage && !dayKey && !timestamp) {
+    const imageSource = this._normalizeImageUrl(
+      this._firstString(imageApiUrl, localUrlFromRecord, fallbackLocalUrl, mediaSourceId)
+    );
+    if (!imageSource && !dayKey && !timestamp) {
       return null;
     }
 
@@ -1970,7 +1984,8 @@ class HalthyWorkoutCard extends HTMLElement {
       timestamp,
       dayKey,
       dateLabel,
-      image: resolvedImage,
+      image: "",
+      imageSource,
       chips: this._chipsFromWorkout(record),
       details: this._workoutDetailsFromItem(record),
       entity_id: entityId,
@@ -2258,7 +2273,10 @@ class HalthyWorkoutCard extends HTMLElement {
     if (!normalized) {
       return null;
     }
-    if (!this._isProtectedMediaLocalUrl(normalized)) {
+    const normalizedAbsoluteUrl = this._sameOriginAbsoluteUrl(normalized);
+    const isProtectedArchiveImage =
+      !!normalizedAbsoluteUrl && normalizedAbsoluteUrl.pathname === "/api/halthy/workout_image";
+    if (!this._isProtectedMediaLocalUrl(normalized) && !isProtectedArchiveImage) {
       return normalized;
     }
 
@@ -2350,17 +2368,66 @@ class HalthyWorkoutCard extends HTMLElement {
   }
 
   _revokeImageObjectUrls() {
-    if (!this._imageObjectUrls || !this._imageObjectUrls.size) {
-      return;
-    }
-    for (const objectUrl of this._imageObjectUrls) {
+    for (const objectUrl of this._imageObjectUrls || []) {
       try {
         URL.revokeObjectURL(objectUrl);
       } catch (_error) {
         // No-op.
       }
     }
-    this._imageObjectUrls.clear();
+    this._imageObjectUrls?.clear();
+    this._resolvedImageUrls?.clear();
+    this._imageLoadsInProgress?.clear();
+  }
+
+  _resolvedWorkoutImage(workout) {
+    const directImage = this._firstString(workout?.image);
+    if (directImage) {
+      return directImage;
+    }
+    const imageSource = this._firstString(workout?.imageSource);
+    return imageSource ? this._firstString(this._resolvedImageUrls.get(imageSource)) : "";
+  }
+
+  _ensureWorkoutImageLoaded(workout) {
+    const imageSource = this._firstString(workout?.imageSource);
+    if (
+      !imageSource ||
+      this._firstString(workout?.image) ||
+      this._resolvedImageUrls.has(imageSource) ||
+      this._imageLoadsInProgress.has(imageSource)
+    ) {
+      return;
+    }
+
+    this._imageLoadsInProgress.add(imageSource);
+    void this._authSafeImageUrl(imageSource)
+      .then((resolvedImage) => {
+        if (resolvedImage) {
+          this._cacheResolvedImage(imageSource, resolvedImage);
+        }
+      })
+      .finally(() => {
+        this._imageLoadsInProgress.delete(imageSource);
+        if (this.isConnected) {
+          this._render();
+        }
+      });
+  }
+
+  _cacheResolvedImage(imageSource, resolvedImage) {
+    this._resolvedImageUrls.delete(imageSource);
+    this._resolvedImageUrls.set(imageSource, resolvedImage);
+
+    while (this._resolvedImageUrls.size > this._maxResolvedImageUrls) {
+      const oldestSource = this._resolvedImageUrls.keys().next().value;
+      const oldestUrl = this._resolvedImageUrls.get(oldestSource);
+      this._resolvedImageUrls.delete(oldestSource);
+      if (oldestUrl && this._imageObjectUrls.has(oldestUrl)) {
+        URL.revokeObjectURL(oldestUrl);
+        this._imageObjectUrls.delete(oldestUrl);
+      }
+    }
   }
 
   disconnectedCallback() {

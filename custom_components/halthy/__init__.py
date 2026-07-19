@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 import asyncio
 import base64
 import binascii
-import hmac
 import hashlib
 import inspect
 import json
@@ -65,9 +64,13 @@ from .const import (
     CONF_OWNER_USER_ID,
     CONF_STATISTICS_ENABLED,
     CONF_TEMPERATURE_UNIT,
+    CONF_WORKOUT_ARCHIVE_RETENTION,
     DEFAULT_ACTIVITY_LOG_MODE,
     DEFAULT_STATISTICS_ENABLED,
     DEFAULT_TEMPERATURE_UNIT,
+    DEFAULT_WORKOUT_ARCHIVE_RETENTION,
+    MAX_WORKOUT_ARCHIVE_RETENTION,
+    MIN_WORKOUT_ARCHIVE_RETENTION,
     DOMAIN,
     COMMAND_ACK_ENDPOINT_NAME,
     COMMAND_ACK_ENDPOINT_PATH,
@@ -399,6 +402,19 @@ def _coerce_force_upload_interval_seconds(raw_value: Any) -> int:
     return value
 
 
+def _coerce_workout_archive_retention(raw_value: Any) -> int:
+    """Return a safe bounded archive retention value."""
+
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        value = DEFAULT_WORKOUT_ARCHIVE_RETENTION
+    return max(
+        MIN_WORKOUT_ARCHIVE_RETENTION,
+        min(MAX_WORKOUT_ARCHIVE_RETENTION, value),
+    )
+
+
 def _coerce_activity_log_mode(raw_value: Any) -> str:
     if isinstance(raw_value, str):
         normalized = raw_value.strip().lower()
@@ -477,6 +493,7 @@ class IntegrationRuntime:
     temperature_unit_preference: str = DEFAULT_TEMPERATURE_UNIT
     activity_log_mode: str = DEFAULT_ACTIVITY_LOG_MODE
     statistics_enabled: bool = DEFAULT_STATISTICS_ENABLED
+    workout_archive_retention: int = DEFAULT_WORKOUT_ARCHIVE_RETENTION
     sensors: dict[str, HalthySensorState] = field(default_factory=dict)
     images: dict[str, HalthyImageState] = field(default_factory=dict)
     statistics_cursors: dict[str, str] = field(default_factory=dict)
@@ -486,7 +503,6 @@ class IntegrationRuntime:
     last_force_upload_ack_status: str | None = None
     daily_upload_count: int = 0
     daily_upload_count_day: str = ""
-    workout_archive_access_token: str = field(default_factory=lambda: uuid4().hex)
     lock: asyncio.Lock | None = None
 
 
@@ -958,16 +974,18 @@ def _workout_archive_timestamp(attributes: dict[str, Any]) -> datetime:
 
 def _image_extension_from_content_type(content_type: str) -> str:
     normalized = content_type.split(";", 1)[0].strip().lower()
-    extension = WORKOUT_IMAGE_CONTENT_TYPE_EXTENSIONS.get(normalized)
-    if extension:
-        return extension
+    return WORKOUT_IMAGE_CONTENT_TYPE_EXTENSIONS.get(normalized, "jpg")
 
-    if "/" not in normalized:
-        return "img"
-    candidate = sanitize_identifier(normalized.split("/", 1)[1]).replace("_", "")
-    if candidate:
-        return candidate[:10]
-    return "img"
+
+def _validated_image_content_type(content_type: str, image_bytes: bytes) -> str | None:
+    """Return a supported canonical MIME type when its signature matches."""
+
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    if normalized in {"image/jpeg", "image/jpg"}:
+        return "image/jpeg" if image_bytes.startswith(b"\xff\xd8\xff") else None
+    if normalized == "image/png":
+        return "image/png" if image_bytes.startswith(b"\x89PNG\r\n\x1a\n") else None
+    return None
 
 
 def _workout_archive_fingerprint(
@@ -1168,6 +1186,39 @@ def _store_workout_archive_file(
     return replaced_count
 
 
+def _prune_workout_archive_files(archive_dir: Path, retention_limit: int) -> int:
+    """Remove the oldest archived workout images after a successful write."""
+
+    retention_limit = max(
+        MIN_WORKOUT_ARCHIVE_RETENTION,
+        min(MAX_WORKOUT_ARCHIVE_RETENTION, int(retention_limit)),
+    )
+    image_paths = sorted(
+        (
+            path
+            for path in archive_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in WORKOUT_ARCHIVE_IMAGE_SUFFIXES
+        ),
+        key=lambda path: (path.stat().st_mtime_ns, path.name),
+        reverse=True,
+    )
+    removed_count = 0
+    for image_path in image_paths[retention_limit:]:
+        try:
+            image_path.unlink()
+            removed_count += 1
+        except OSError:
+            _LOGGER.debug("Failed to prune workout archive file: %s", image_path)
+            continue
+        try:
+            _workout_archive_metadata_path(image_path).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            _LOGGER.debug("Failed to prune workout archive metadata: %s", image_path)
+    return removed_count
+
+
 async def _async_archive_workout_image(
     hass: HomeAssistant,
     username: str,
@@ -1175,6 +1226,7 @@ async def _async_archive_workout_image(
     content_type: str,
     image_bytes: bytes,
     attributes: dict[str, Any],
+    retention_limit: int,
 ) -> dict[str, Any]:
     if _normalize_metric_key(metric_key) != WORKOUT_IMAGE_METRIC_KEY:
         return attributes
@@ -1202,6 +1254,11 @@ async def _async_archive_workout_image(
             file_name,
             attributes,
         )
+        pruned_count = await hass.async_add_executor_job(
+            _prune_workout_archive_files,
+            archive_dir,
+            retention_limit,
+        )
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning(
             "Failed to archive workout image for '%s' (%s): %s",
@@ -1219,6 +1276,7 @@ async def _async_archive_workout_image(
         f"media-source://media_source/local/{relative_path}"
     )
     archived_attributes["archive_replaced_file_count"] = replaced_count
+    archived_attributes["archive_pruned_file_count"] = pruned_count
     archived_attributes["archive_workout_fingerprint"] = workout_fingerprint
     archived_attributes["archive_workout_timestamp"] = (
         workout_timestamp.isoformat().replace("+00:00", "Z")
@@ -1411,15 +1469,13 @@ async def _async_collect_workout_archive_records(
 def _workout_archive_image_url(
     username: str,
     relative_path: str,
-    token: str,
     version: str | None = None,
 ) -> str:
     encoded_username = quote(username, safe="")
     encoded_path = quote(relative_path, safe="")
-    encoded_token = quote(token, safe="")
     url = (
         f"{WORKOUT_ARCHIVE_IMAGE_ENDPOINT_PATH}"
-        f"?username={encoded_username}&path={encoded_path}&token={encoded_token}"
+        f"?username={encoded_username}&path={encoded_path}"
     )
     normalized_version = str(version or "").strip()
     if normalized_version:
@@ -1822,17 +1878,20 @@ def _sensor_to_storage(state: HalthySensorState) -> dict[str, Any]:
 
 
 def _image_to_storage(state: HalthyImageState) -> dict[str, Any]:
-    return {
+    payload = {
         "unique_id": state.unique_id,
         "metric_key": state.metric_key,
         "name": state.name,
         "content_type": state.content_type,
-        "image_base64": base64.b64encode(state.image_bytes).decode("ascii"),
         "attributes": _json_safe(state.attributes),
         "username": state.username,
         "device_id": state.device_id,
         "updated_at": state.updated_at.isoformat(),
     }
+    archive_path = str(state.attributes.get("archive_relative_path", "")).strip()
+    if _normalize_metric_key(state.metric_key) != WORKOUT_IMAGE_METRIC_KEY or not archive_path:
+        payload["image_base64"] = base64.b64encode(state.image_bytes).decode("ascii")
+    return payload
 
 
 def _sensor_from_storage(unique_id: str, raw: Any) -> HalthySensorState | None:
@@ -1861,7 +1920,11 @@ def _sensor_from_storage(unique_id: str, raw: Any) -> HalthySensorState | None:
     )
 
 
-def _image_from_storage(unique_id: str, raw: Any) -> HalthyImageState | None:
+def _image_from_storage(
+    unique_id: str,
+    raw: Any,
+    media_root: Path | None = None,
+) -> HalthyImageState | None:
     if not isinstance(raw, dict):
         return None
 
@@ -1870,29 +1933,38 @@ def _image_from_storage(unique_id: str, raw: Any) -> HalthyImageState | None:
         return None
     metric_key = _normalize_metric_key(raw_metric_key)
 
-    raw_base64 = raw.get("image_base64")
-    if not isinstance(raw_base64, str) or not raw_base64.strip():
-        return None
-
-    try:
-        image_bytes = base64.b64decode(raw_base64.encode("ascii"), validate=True)
-    except (ValueError, binascii.Error):
-        return None
-
-    if not image_bytes or len(image_bytes) > MAX_IMAGE_BYTES:
-        return None
-
     attrs = raw.get("attributes")
     attributes = attrs if isinstance(attrs, dict) else {}
     content_type = str(raw.get("content_type", "image/jpeg")).strip() or "image/jpeg"
-    if not content_type.startswith("image/"):
-        content_type = "image/jpeg"
+    raw_base64 = raw.get("image_base64")
+    image_bytes: bytes | None = None
+    if isinstance(raw_base64, str) and raw_base64.strip():
+        try:
+            image_bytes = base64.b64decode(raw_base64.encode("ascii"), validate=True)
+        except (ValueError, binascii.Error):
+            return None
+    elif media_root is not None and metric_key == WORKOUT_IMAGE_METRIC_KEY:
+        username = str(raw.get("username", "")).strip()
+        relative_path = str(attributes.get("archive_relative_path", "")).strip()
+        resolved_path = _resolve_workout_archive_file_path(media_root, username, relative_path)
+        if resolved_path is not None:
+            try:
+                with resolved_path.open("rb") as handle:
+                    image_bytes = handle.read(MAX_IMAGE_BYTES + 1)
+            except OSError:
+                image_bytes = None
+
+    if not image_bytes or len(image_bytes) > MAX_IMAGE_BYTES:
+        return None
+    canonical_content_type = _validated_image_content_type(content_type, image_bytes)
+    if canonical_content_type is None:
+        return None
 
     return HalthyImageState(
         unique_id=str(raw.get("unique_id", unique_id)),
         metric_key=metric_key,
         name=_friendly_metric_name(metric_key, raw.get("name")),
-        content_type=content_type,
+        content_type=canonical_content_type,
         image_bytes=image_bytes,
         attributes=attributes,
         username=str(raw.get("username", "")).strip() or "unknown",
@@ -2364,12 +2436,13 @@ class HalthyPushView(HomeAssistantView):
                     status=413,
                 )
 
-            content_type = str(raw_image.get("content_type", "image/jpeg")).strip() or "image/jpeg"
-            if not content_type.startswith("image/"):
+            declared_content_type = str(raw_image.get("content_type", "image/jpeg")).strip() or "image/jpeg"
+            content_type = _validated_image_content_type(declared_content_type, image_bytes)
+            if content_type is None:
                 return web.json_response(
                     {
                         "error": "invalid_content_type",
-                        "message": f"Image '{metric_key}' must use an image/* content type",
+                        "message": f"Image '{metric_key}' must contain valid JPEG or PNG data",
                     },
                     status=400,
                 )
@@ -2429,6 +2502,9 @@ class HalthyPushView(HomeAssistantView):
             )
 
         for prepared_image in prepared_images:
+            retention_limit = max(
+                runtime.workout_archive_retention for _, runtime in target_entries
+            )
             prepared_image["attributes"] = await _async_archive_workout_image(
                 hass=hass,
                 username=username,
@@ -2436,6 +2512,7 @@ class HalthyPushView(HomeAssistantView):
                 content_type=prepared_image["content_type"],
                 image_bytes=prepared_image["image_bytes"],
                 attributes=prepared_image["attributes"],
+                retention_limit=retention_limit,
             )
 
         created = 0
@@ -3095,14 +3172,12 @@ class HalthyWorkoutArchiveView(HomeAssistantView):
             username=runtime_username,
             limit=limit,
         )
-        image_token = runtime.workout_archive_access_token
         response_workouts = [
             {
                 **workout,
                 "image_url": _workout_archive_image_url(
                     runtime_username,
                     str(workout.get("relative_path", "")),
-                    image_token,
                     str(workout.get("modified_at", "")),
                 ),
             }
@@ -3120,11 +3195,11 @@ class HalthyWorkoutArchiveView(HomeAssistantView):
 
 
 class HalthyWorkoutArchiveImageView(HomeAssistantView):
-    """Serve archived workout images via tokenized URL for dashboard cards."""
+    """Serve archived workout images to authenticated dashboard users."""
 
     url = WORKOUT_ARCHIVE_IMAGE_ENDPOINT_PATH
     name = WORKOUT_ARCHIVE_IMAGE_ENDPOINT_NAME
-    requires_auth = False
+    requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
         hass: HomeAssistant = request.app[KEY_HASS]
@@ -3135,7 +3210,6 @@ class HalthyWorkoutArchiveImageView(HomeAssistantView):
 
         username = str(request.query.get("username", "")).strip()
         relative_path = str(request.query.get("path", "")).strip()
-        token = str(request.query.get("token", "")).strip()
         if not username or not relative_path:
             return web.Response(status=400)
 
@@ -3145,17 +3219,15 @@ class HalthyWorkoutArchiveImageView(HomeAssistantView):
         _, runtime = target_entries[0]
 
         request_user_id = _request_user_id_from_request(request)
+        if request_user_id is None:
+            return web.Response(status=403)
         should_save = False
-        if request_user_id is not None:
-            async with _runtime_lock(runtime):
-                if runtime.owner_user_id and runtime.owner_user_id != request_user_id:
-                    return web.Response(status=403)
-                if runtime.owner_user_id is None:
-                    runtime.owner_user_id = request_user_id
-                    should_save = True
-        else:
-            if not token or not hmac.compare_digest(token, runtime.workout_archive_access_token):
-                return web.Response(status=401)
+        async with _runtime_lock(runtime):
+            if runtime.owner_user_id and runtime.owner_user_id != request_user_id:
+                return web.Response(status=403)
+            if runtime.owner_user_id is None:
+                runtime.owner_user_id = request_user_id
+                should_save = True
 
         if should_save:
             _schedule_store_save(hass)
@@ -3598,6 +3670,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry.data.get(CONF_STATISTICS_ENABLED, DEFAULT_STATISTICS_ENABLED),
         )
     )
+    workout_archive_retention = _coerce_workout_archive_retention(
+        entry.options.get(CONF_WORKOUT_ARCHIVE_RETENTION)
+    )
 
     stored_username = stored_entry.get("configured_username")
     if not entry_app_username and isinstance(stored_username, str) and stored_username.strip():
@@ -3642,6 +3717,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         temperature_unit_preference=temperature_unit_preference,
         activity_log_mode=activity_log_mode,
         statistics_enabled=statistics_enabled,
+        workout_archive_retention=workout_archive_retention,
         force_upload_interval_seconds=force_upload_interval_seconds,
         pending_force_upload_command=pending_force_upload_command,
         last_force_upload_ack_at=last_force_upload_ack_at,
@@ -3659,8 +3735,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     stored_images = stored_entry.get("images", {})
     if isinstance(stored_images, dict):
+        media_root = Path(hass.config.path("media"))
         for unique_id, raw_image in stored_images.items():
-            restored = _image_from_storage(unique_id, raw_image)
+            restored = await hass.async_add_executor_job(
+                _image_from_storage,
+                unique_id,
+                raw_image,
+                media_root,
+            )
             if restored is not None:
                 runtime.images[unique_id] = restored
 

@@ -291,17 +291,53 @@ class StatisticsHelpersTests(unittest.TestCase):
             self.assertEqual(len(records), 1)
             self.assertIn("/halthy/workouts/tester/", records[0]["local_url"])
 
-    def test_workout_archive_image_url_is_tokenized(self) -> None:
+    def test_workout_archive_image_url_contains_no_access_token(self) -> None:
         url = BRIDGE._workout_archive_image_url(
             "tester_1",
             "halthy/workouts/tester_1/20260401T101112Z_uuid.jpg",
-            "abc123",
             "2026-04-01T10:11:13Z",
         )
         self.assertIn("/api/halthy/workout_image?", url)
         self.assertIn("username=tester_1", url)
-        self.assertIn("token=abc123", url)
+        self.assertNotIn("token=", url)
         self.assertIn("v=2026-04-01T10%3A11%3A13Z", url)
+
+    def test_image_content_type_requires_matching_signature(self) -> None:
+        self.assertEqual(
+            BRIDGE._validated_image_content_type("image/jpeg", b"\xff\xd8\xffpayload"),
+            "image/jpeg",
+        )
+        self.assertEqual(
+            BRIDGE._validated_image_content_type("image/png", b"\x89PNG\r\n\x1a\npayload"),
+            "image/png",
+        )
+        self.assertIsNone(BRIDGE._validated_image_content_type("image/jpeg", b"not-an-image"))
+        self.assertIsNone(BRIDGE._validated_image_content_type("image/svg+xml", b"<svg/>"))
+
+    def test_workout_archive_prunes_oldest_images_and_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            archive_dir = pathlib.Path(temporary_directory)
+            image_paths: list[pathlib.Path] = []
+            for index in range(27):
+                image_path = archive_dir / f"workout_{index:02d}.jpg"
+                image_path.write_bytes(b"\xff\xd8\xffpayload")
+                BRIDGE._workout_archive_metadata_path(image_path).write_text("{}")
+                os.utime(image_path, (index + 1, index + 1))
+                image_paths.append(image_path)
+
+            removed = BRIDGE._prune_workout_archive_files(archive_dir, 25)
+
+            self.assertEqual(removed, 2)
+            self.assertFalse(image_paths[0].exists())
+            self.assertFalse(image_paths[1].exists())
+            self.assertFalse(BRIDGE._workout_archive_metadata_path(image_paths[0]).exists())
+            self.assertEqual(len(list(archive_dir.glob("*.jpg"))), 25)
+            self.assertEqual(len(list(archive_dir.glob("*.json"))), 25)
+
+    def test_workout_archive_retention_is_bounded(self) -> None:
+        self.assertEqual(BRIDGE._coerce_workout_archive_retention("invalid"), 250)
+        self.assertEqual(BRIDGE._coerce_workout_archive_retention(1), 25)
+        self.assertEqual(BRIDGE._coerce_workout_archive_retention(9000), 2000)
 
     def test_workout_archive_file_name_uses_timestamp_and_workout_uuid(self) -> None:
         file_name, workout_fingerprint, workout_timestamp, extension = (

@@ -21,10 +21,14 @@ from .const import (
     CONF_OWNER_USER_ID,
     CONF_STATISTICS_ENABLED,
     CONF_TEMPERATURE_UNIT,
+    CONF_WORKOUT_ARCHIVE_RETENTION,
     DEFAULT_ACTIVITY_LOG_MODE,
     DEFAULT_STATISTICS_ENABLED,
     DEFAULT_TEMPERATURE_UNIT,
+    DEFAULT_WORKOUT_ARCHIVE_RETENTION,
     DOMAIN,
+    MAX_WORKOUT_ARCHIVE_RETENTION,
+    MIN_WORKOUT_ARCHIVE_RETENTION,
     TEMPERATURE_UNIT_CELSIUS,
     TEMPERATURE_UNIT_FAHRENHEIT,
     TEMPERATURE_UNIT_SYSTEM,
@@ -35,6 +39,17 @@ from .const import (
 
 def _normalize_username(value: str) -> str:
     return re.sub(r"[^a-z0-9_]+", "_", value.lower()).strip("_")
+
+
+def _bounded_workout_archive_retention(value: Any) -> int:
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        normalized = DEFAULT_WORKOUT_ARCHIVE_RETENTION
+    return max(
+        MIN_WORKOUT_ARCHIVE_RETENTION,
+        min(MAX_WORKOUT_ARCHIVE_RETENTION, normalized),
+    )
 
 
 def _entry_app_username(config_entry: config_entries.ConfigEntry) -> str:
@@ -151,6 +166,12 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
         ).strip()
         if current_activity_log_mode not in VALID_ACTIVITY_LOG_MODES:
             current_activity_log_mode = DEFAULT_ACTIVITY_LOG_MODE
+        current_workout_archive_retention = _bounded_workout_archive_retention(
+            self._config_entry.options.get(
+                CONF_WORKOUT_ARCHIVE_RETENTION,
+                DEFAULT_WORKOUT_ARCHIVE_RETENTION,
+            )
+        )
 
         if user_input is not None:
             username = str(user_input.get(CONF_APP_USERNAME, current_username)).strip()
@@ -176,6 +197,12 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
             ).strip()
             if selected_activity_log_mode not in VALID_ACTIVITY_LOG_MODES:
                 selected_activity_log_mode = DEFAULT_ACTIVITY_LOG_MODE
+            selected_workout_archive_retention = _bounded_workout_archive_retention(
+                user_input.get(
+                    CONF_WORKOUT_ARCHIVE_RETENTION,
+                    current_workout_archive_retention,
+                )
+            )
 
             if errors:
                 return self.async_show_form(
@@ -186,6 +213,7 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                         temperature_unit=selected_unit,
                         activity_log_mode=selected_activity_log_mode,
                         statistics_enabled=selected_statistics_enabled,
+                        workout_archive_retention=selected_workout_archive_retention,
                     ),
                     errors=errors,
                 )
@@ -206,6 +234,7 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                     CONF_TEMPERATURE_UNIT: selected_unit,
                     CONF_ACTIVITY_LOG_MODE: selected_activity_log_mode,
                     CONF_STATISTICS_ENABLED: selected_statistics_enabled,
+                    CONF_WORKOUT_ARCHIVE_RETENTION: selected_workout_archive_retention,
                 },
             )
 
@@ -217,6 +246,7 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                 temperature_unit=current_unit,
                 activity_log_mode=current_activity_log_mode,
                 statistics_enabled=current_statistics_enabled,
+                workout_archive_retention=current_workout_archive_retention,
             ),
         )
 
@@ -228,6 +258,7 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
         temperature_unit: str,
         activity_log_mode: str,
         statistics_enabled: bool,
+        workout_archive_retention: int,
     ) -> vol.Schema:
         data_schema = vol.Schema(
             {
@@ -277,7 +308,18 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
-                )
+                ),
+                vol.Required(
+                    CONF_WORKOUT_ARCHIVE_RETENTION,
+                    default=workout_archive_retention,
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=MIN_WORKOUT_ARCHIVE_RETENTION,
+                        max=MAX_WORKOUT_ARCHIVE_RETENTION,
+                        step=25,
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
             }
         )
         return data_schema

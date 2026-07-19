@@ -1,4 +1,4 @@
-name: Python Syntax
+name: Integration validation
 
 on:
   push:
@@ -18,3 +18,9 @@ jobs:
 
       - name: Compile custom_components
         run: python -m compileall -q custom_components
+
+      - name: Run integration regression tests
+        run: python custom_components/halthy/tests/test_statistics.py
+
+      - name: Validate workout card JavaScript
+        run: node --check custom_components/halthy/halthy-workout-card.js

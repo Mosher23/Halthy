@@ -22,13 +22,14 @@
     "step": {
       "init": {
         "title": "Halthy Options",
-        "description": "Update the username, display name, units, and activity log behavior for this Halthy entry.",
+        "description": "Update the username, display name, units, activity log behavior, and workout archive retention for this Halthy entry.",
         "data": {
           "app_username": "Username",
           "name": "Display name (optional)",
           "temperature_unit": "Temperature unit",
           "activity_log_mode": "Activity log mode",
-          "statistics_enabled": "Import historical statistics"
+          "statistics_enabled": "Import historical statistics",
+          "workout_archive_retention": "Stored workout images"
         }
       }
     },
