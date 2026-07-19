@@ -93,6 +93,7 @@ from .const import (
     remove_sensor_signal,
     update_image_signal,
     update_sensor_signal,
+    workout_calendar_updated_signal,
 )
 from .naming import (
     friendly_metric_name,
@@ -115,6 +116,7 @@ STORAGE_KEY = f"{DOMAIN}_runtime"
 SAVE_DELAY_SECONDS = 5
 MAX_SENSORS_PER_PUSH = 256
 MAX_IMAGES_PER_PUSH = 16
+MAX_WORKOUTS_PER_PUSH = 250
 MAX_REQUEST_BYTES = 512 * 1024
 MAX_ATTRIBUTES_BYTES = 64 * 1024
 MAX_ROUTE_POINTS = 120
@@ -483,6 +485,18 @@ class HalthyImageState:
 
 
 @dataclass(slots=True)
+class HalthyWorkoutRecord:
+    """Persistent metadata for one HealthKit workout."""
+
+    record_id: str
+    uid: str
+    summary: str
+    start: datetime
+    end: datetime
+    metadata: dict[str, Any]
+
+
+@dataclass(slots=True)
 class IntegrationRuntime:
     """Runtime data shared between endpoint and sensor platform."""
 
@@ -496,6 +510,7 @@ class IntegrationRuntime:
     workout_archive_retention: int = DEFAULT_WORKOUT_ARCHIVE_RETENTION
     sensors: dict[str, HalthySensorState] = field(default_factory=dict)
     images: dict[str, HalthyImageState] = field(default_factory=dict)
+    workouts: dict[str, HalthyWorkoutRecord] = field(default_factory=dict)
     statistics_cursors: dict[str, str] = field(default_factory=dict)
     force_upload_interval_seconds: int = FORCE_UPLOAD_INTERVAL_DEFAULT_SECONDS
     pending_force_upload_command: dict[str, Any] | None = None
@@ -957,6 +972,189 @@ def _first_nonempty_attribute_value(attributes: dict[str, Any], keys: tuple[str,
         if value:
             return value
     return None
+
+
+def _workout_title(raw_title: Any) -> str:
+    """Return a readable title for HealthKit workout type values."""
+
+    title = str(raw_title or "").strip()
+    title = re.sub(r"^HKWorkoutActivityType", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", title)
+    title = re.sub(r"[_-]+", " ", title)
+    words = title.split()
+    if not words:
+        return "Workout"
+    return " ".join(word if word.isupper() else word.capitalize() for word in words)
+
+
+def _workout_numeric_value(attributes: dict[str, Any], keys: tuple[str, ...]) -> float | None:
+    for key in keys:
+        raw_value = attributes.get(key)
+        if isinstance(raw_value, bool) or raw_value is None:
+            continue
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            return value
+    return None
+
+
+def _workout_datetime_value(attributes: dict[str, Any], keys: tuple[str, ...]) -> datetime | None:
+    raw_value = _first_nonempty_attribute_value(attributes, keys)
+    return _parse_measurement_timestamp(raw_value)
+
+
+def _workout_record_from_attributes(attributes: dict[str, Any]) -> HalthyWorkoutRecord | None:
+    """Build one normalized calendar record from app or archive metadata."""
+
+    start = _workout_datetime_value(attributes, ("workout_start", "start", "start_time"))
+    end = _workout_datetime_value(attributes, ("workout_end", "end", "end_time"))
+    duration_seconds = _workout_numeric_value(
+        attributes,
+        ("workout_duration_s", "duration_s", "duration_seconds", "duration"),
+    )
+    duration_seconds = max(duration_seconds or 0.0, 0.0)
+
+    fallback_timestamp = _workout_datetime_value(
+        attributes,
+        (
+            "archive_workout_timestamp",
+            "measurement_timestamp",
+            "measured_at",
+            "recorded_at",
+            "observed_at",
+            "sample_timestamp",
+            "timestamp",
+            "last_pushed",
+            "updated_at",
+        ),
+    )
+    if start is None and end is None:
+        if fallback_timestamp is None:
+            return None
+        end = fallback_timestamp
+        start = end - timedelta(seconds=duration_seconds or 60.0)
+    elif start is None and end is not None:
+        start = end - timedelta(seconds=duration_seconds or 60.0)
+    elif end is None and start is not None:
+        end = start + timedelta(seconds=duration_seconds or 60.0)
+
+    if start is None or end is None:
+        return None
+    start = start.astimezone(timezone.utc)
+    end = end.astimezone(timezone.utc)
+    if end <= start:
+        end = start + timedelta(seconds=duration_seconds or 60.0)
+
+    raw_uid = _first_nonempty_attribute_value(attributes, WORKOUT_ARCHIVE_ID_ATTRIBUTE_KEYS)
+    if raw_uid:
+        uid = raw_uid
+        record_id = f"uuid:{raw_uid.casefold()}"
+    else:
+        identity_source = "|".join(
+            (
+                start.isoformat(),
+                end.isoformat(),
+                _first_nonempty_attribute_value(
+                    attributes,
+                    (*WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS, "activity_type", "workout_kind"),
+                )
+                or "Workout",
+            )
+        )
+        digest = hashlib.sha1(identity_source.encode(), usedforsecurity=False).hexdigest()
+        uid = f"halthy-{digest}"
+        record_id = f"signature:{digest}"
+
+    raw_summary = _first_nonempty_attribute_value(
+        attributes,
+        (
+            *WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS,
+            "activity_type",
+            "workout_kind",
+            "title",
+            "name",
+        ),
+    )
+    metadata = _workout_archive_metadata_from_attributes(attributes)
+    metadata["workout_start"] = start.isoformat()
+    metadata["workout_end"] = end.isoformat()
+    metadata.setdefault("workout_uuid", raw_uid or uid)
+    metadata["workout_type"] = _workout_title(raw_summary)
+    return HalthyWorkoutRecord(
+        record_id=record_id,
+        uid=uid,
+        summary=_workout_title(raw_summary),
+        start=start,
+        end=end,
+        metadata=metadata,
+    )
+
+
+def _upsert_workout_record(
+    runtime: IntegrationRuntime,
+    attributes: dict[str, Any],
+) -> str | None:
+    """Create, update, or deduplicate one workout ledger record."""
+
+    record = _workout_record_from_attributes(attributes)
+    if record is None:
+        return None
+    existing = runtime.workouts.get(record.record_id)
+    migrated_record_id: str | None = None
+    if existing is None and record.record_id.startswith("uuid:"):
+        for candidate_id, candidate in runtime.workouts.items():
+            if (
+                candidate_id.startswith("signature:")
+                and candidate.start == record.start
+                and candidate.end == record.end
+                and candidate.summary == record.summary
+            ):
+                existing = candidate
+                migrated_record_id = candidate_id
+                break
+
+    if existing is not None:
+        record.metadata = {**existing.metadata, **record.metadata}
+    if existing == record:
+        return "duplicate"
+    if migrated_record_id is not None:
+        runtime.workouts.pop(migrated_record_id, None)
+    runtime.workouts[record.record_id] = record
+    return "created" if existing is None else "updated"
+
+
+def _workout_to_storage(record: HalthyWorkoutRecord) -> dict[str, Any]:
+    return {
+        "record_id": record.record_id,
+        "uid": record.uid,
+        "summary": record.summary,
+        "start": record.start.isoformat(),
+        "end": record.end.isoformat(),
+        "metadata": _json_safe(record.metadata),
+    }
+
+
+def _workout_from_storage(record_id: str, raw: Any) -> HalthyWorkoutRecord | None:
+    if not isinstance(raw, dict):
+        return None
+    metadata = raw.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    restored_attributes = dict(metadata)
+    restored_attributes.setdefault("workout_uuid", raw.get("uid"))
+    restored_attributes.setdefault("workout_type", raw.get("summary"))
+    restored_attributes.setdefault("workout_start", raw.get("start"))
+    restored_attributes.setdefault("workout_end", raw.get("end"))
+    restored = _workout_record_from_attributes(restored_attributes)
+    if restored is None:
+        return None
+    stored_record_id = str(raw.get("record_id") or record_id).strip()
+    if stored_record_id:
+        restored.record_id = stored_record_id
+    return restored
 
 
 def _workout_archive_timestamp(attributes: dict[str, Any]) -> datetime:
@@ -2002,6 +2200,10 @@ def _serialize_entries(entries: dict[str, IntegrationRuntime]) -> dict[str, Any]
                 unique_id: _image_to_storage(image_state)
                 for unique_id, image_state in runtime.images.items()
             },
+            "workouts": {
+                record_id: _workout_to_storage(workout)
+                for record_id, workout in runtime.workouts.items()
+            },
         }
 
     return payload
@@ -2349,7 +2551,21 @@ class HalthyPushView(HomeAssistantView):
                 },
                 status=413,
             )
-        if not sensors_payload and not images_payload and not prune_unselected_metrics:
+
+        workouts_payload = payload.get("workouts")
+        if workouts_payload is None:
+            workouts_payload = []
+        if not isinstance(workouts_payload, list):
+            return web.json_response({"error": "invalid_workouts"}, status=400)
+        if len(workouts_payload) > MAX_WORKOUTS_PER_PUSH:
+            return web.json_response(
+                {
+                    "error": "too_many_workouts",
+                    "message": f"At most {MAX_WORKOUTS_PER_PUSH} workouts are allowed per push",
+                },
+                status=413,
+            )
+        if not sensors_payload and not images_payload and not workouts_payload and not prune_unselected_metrics:
             return web.json_response({"error": "missing_sensors"}, status=400)
 
         request_user = request.get("hass_user")
@@ -2470,7 +2686,23 @@ class HalthyPushView(HomeAssistantView):
                 }
             )
 
-        if not prepared_sensors and not prepared_images and not prune_unselected_metrics:
+        prepared_workouts: list[dict[str, Any]] = []
+        for raw_workout in workouts_payload:
+            if not isinstance(raw_workout, dict):
+                continue
+            workout = _normalize_attributes(raw_workout)
+            if not _attributes_within_size_limit(workout):
+                return web.json_response(
+                    {
+                        "error": "workout_too_large",
+                        "message": "Workout metadata exceeds the allowed size",
+                    },
+                    status=413,
+                )
+            if _workout_record_from_attributes(workout) is not None:
+                prepared_workouts.append(workout)
+
+        if not prepared_sensors and not prepared_images and not prepared_workouts and not prune_unselected_metrics:
             return web.json_response({"error": "no_valid_sensors"}, status=400)
 
         normalized_username = _sanitize(username)
@@ -2520,6 +2752,8 @@ class HalthyPushView(HomeAssistantView):
         deleted = 0
         duplicates = 0
         ignored_older = 0
+        workouts_created = 0
+        workouts_updated = 0
         accepted_sensor_ids: list[str] = []
         accepted_image_ids: list[str] = []
         removed_sensors_by_entry: list[tuple[str, str]] = []
@@ -2537,6 +2771,7 @@ class HalthyPushView(HomeAssistantView):
             pending_sensor_updates: list[str] = []
             pending_image_new: list[str] = []
             pending_image_updates: list[str] = []
+            workout_calendar_changed = False
             async with _runtime_lock(runtime):
                 if runtime.owner_user_id is None:
                     runtime.owner_user_id = request_user_id
@@ -2550,6 +2785,30 @@ class HalthyPushView(HomeAssistantView):
                 runtime_statistics_candidates: list[dict[str, Any]] = []
                 entry_has_state_update = False
                 entry_last_update_at: datetime | None = None
+                workout_inputs = list(prepared_workouts)
+                workout_inputs.extend(
+                    prepared_image["attributes"]
+                    for prepared_image in prepared_images
+                    if prepared_image["metric_key"] == WORKOUT_IMAGE_METRIC_KEY
+                )
+                for workout_attributes in workout_inputs:
+                    workout_result = _upsert_workout_record(runtime, workout_attributes)
+                    if workout_result == "created":
+                        workouts_created += 1
+                        workout_calendar_changed = True
+                    elif workout_result == "updated":
+                        workouts_updated += 1
+                        workout_calendar_changed = True
+                    elif workout_result == "duplicate":
+                        duplicates += 1
+
+                    if workout_result in {"created", "updated"}:
+                        workout_record = _workout_record_from_attributes(workout_attributes)
+                        if workout_record is not None:
+                            if entry_last_update_at is None or workout_record.end > entry_last_update_at:
+                                entry_last_update_at = workout_record.end
+                        entry_has_state_update = True
+
                 for prepared_sensor in prepared_sensors:
                     metric_key = prepared_sensor["metric_key"]
                     state = prepared_sensor["state"]
@@ -2797,6 +3056,8 @@ class HalthyPushView(HomeAssistantView):
                 async_dispatcher_send(hass, new_image_signal(entry_id), unique_id)
             for unique_id in pending_image_updates:
                 async_dispatcher_send(hass, update_image_signal(entry_id, unique_id))
+            if workout_calendar_changed:
+                async_dispatcher_send(hass, workout_calendar_updated_signal(entry_id))
 
         imported_statistics_samples = 0
         for runtime, runtime_statistics_batches, runtime_cursor_updates in statistics_jobs:
@@ -2814,7 +3075,12 @@ class HalthyPushView(HomeAssistantView):
                     )
         _schedule_store_save(hass)
 
-        accepted_total = len(accepted_sensor_ids) + len(accepted_image_ids)
+        accepted_total = (
+            len(accepted_sensor_ids)
+            + len(accepted_image_ids)
+            + workouts_created
+            + workouts_updated
+        )
         accepted_sensor_unique_ids = list(dict.fromkeys(accepted_sensor_ids))
         accepted_image_unique_ids = list(dict.fromkeys(accepted_image_ids))
         if accepted_total == 0 and deleted == 0:
@@ -2828,6 +3094,8 @@ class HalthyPushView(HomeAssistantView):
                         "deleted": 0,
                         "duplicates": duplicates,
                         "ignored_older": ignored_older,
+                        "workouts_created": workouts_created,
+                        "workouts_updated": workouts_updated,
                         "accepted_sensor_unique_ids": [],
                         "accepted_image_unique_ids": [],
                         "unique_ids": [],
@@ -2847,6 +3115,8 @@ class HalthyPushView(HomeAssistantView):
                         "deleted": 0,
                         "duplicates": duplicates,
                         "ignored_older": ignored_older,
+                        "workouts_created": workouts_created,
+                        "workouts_updated": workouts_updated,
                         "accepted_sensor_unique_ids": [],
                         "accepted_image_unique_ids": [],
                         "unique_ids": [],
@@ -2901,12 +3171,14 @@ class HalthyPushView(HomeAssistantView):
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug(
-                "Processed Halthy push: username=%s accepted=%d created=%d updated=%d deleted=%d stats_imported=%d",
+                "Processed Halthy push: username=%s accepted=%d created=%d updated=%d deleted=%d workouts_created=%d workouts_updated=%d stats_imported=%d",
                 username,
                 accepted_total,
                 created,
                 updated,
                 deleted,
+                workouts_created,
+                workouts_updated,
                 imported_statistics_samples,
             )
 
@@ -2919,6 +3191,8 @@ class HalthyPushView(HomeAssistantView):
                 "deleted": deleted,
                 "duplicates": duplicates,
                 "ignored_older": ignored_older,
+                "workouts_created": workouts_created,
+                "workouts_updated": workouts_updated,
                 "accepted_sensor_unique_ids": accepted_sensor_unique_ids,
                 "accepted_image_unique_ids": accepted_image_unique_ids,
                 "unique_ids": accepted_sensor_unique_ids + accepted_image_unique_ids,
@@ -3745,6 +4019,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
             if restored is not None:
                 runtime.images[unique_id] = restored
+
+    stored_workouts = stored_entry.get("workouts", {})
+    if isinstance(stored_workouts, dict):
+        for record_id, raw_workout in stored_workouts.items():
+            restored = _workout_from_storage(str(record_id), raw_workout)
+            if restored is not None:
+                runtime.workouts[restored.record_id] = restored
+
+    archived_workouts = await _async_collect_workout_archive_records(
+        hass,
+        configured_username,
+        MAX_WORKOUT_ARCHIVE_RETENTION * len(WORKOUT_ARCHIVE_FOLDER_DOMAIN_CANDIDATES),
+    )
+    for archived_workout in archived_workouts:
+        migrated = _workout_record_from_attributes(archived_workout)
+        if migrated is not None and migrated.record_id not in runtime.workouts:
+            runtime.workouts[migrated.record_id] = migrated
 
     stored_statistics_cursors = stored_entry.get("statistics_cursors", {})
     if isinstance(stored_statistics_cursors, dict):

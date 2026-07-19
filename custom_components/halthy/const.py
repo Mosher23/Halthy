@@ -55,7 +55,14 @@ SERVICE_FORCE_INFLUX_BACKFILL = "force_influx_backfill"
 _IMAGE_PLATFORM = getattr(Platform, "IMAGE", "image")
 _SELECT_PLATFORM = getattr(Platform, "SELECT", "select")
 _BUTTON_PLATFORM = getattr(Platform, "BUTTON", "button")
-PLATFORMS: list[Platform | str] = [Platform.SENSOR, _IMAGE_PLATFORM, _SELECT_PLATFORM, _BUTTON_PLATFORM]
+_CALENDAR_PLATFORM = getattr(Platform, "CALENDAR", "calendar")
+PLATFORMS: list[Platform | str] = [
+    Platform.SENSOR,
+    _IMAGE_PLATFORM,
+    _SELECT_PLATFORM,
+    _BUTTON_PLATFORM,
+    _CALENDAR_PLATFORM,
+]
 
 
 def new_sensor_signal(entry_id: str) -> str:
@@ -86,3 +93,8 @@ def update_image_signal(entry_id: str, unique_id: str) -> str:
 def remove_image_signal(entry_id: str, unique_id: str) -> str:
     """Signal name emitted when an image should be removed."""
     return f"{DOMAIN}_remove_image_{entry_id}_{unique_id}"
+
+
+def workout_calendar_updated_signal(entry_id: str) -> str:
+    """Signal emitted when an entry's workout calendar changes."""
+    return f"{DOMAIN}_workout_calendar_updated_{entry_id}"

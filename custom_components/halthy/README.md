@@ -15,6 +15,7 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
 - Supports optional logbook activity logging
 - Imports numeric samples with timestamps into Home Assistant recorder statistics
 - Includes a bundled workout card with route map navigation, calendar archive, and multi-workout day selection
+- Creates a read-only Home Assistant workout calendar for each configured person
 
 ## Installation
 
@@ -58,6 +59,20 @@ user: your_username
 ```
 
 The visual card editor detects configured Halthy users and proposes them for selection.
+
+## Workout Calendar
+
+Each Halthy config entry creates `calendar.<username>_workouts`. Add this entity to Home Assistant's Calendar dashboard to browse workouts at their actual start and end times.
+
+- Workouts with and without route maps are supported.
+- Multiple workouts on one day are separate events.
+- HealthKit UUIDs prevent duplicates and allow later uploads to update an event.
+- Event descriptions include available summary values such as duration, distance, active energy, average heart rate, cadence, and speed.
+- Calendar metadata remains stored even when an old route image is pruned.
+
+Unlock the iPhone and perform a foreground upload or **Force upload** once after upgrading the integration and app. The app uploads the available HealthKit workout history in bounded batches. Existing route archive metadata is migrated automatically during integration setup.
+
+The calendar is read-only; workout changes must be made in Apple Health or the app that originally recorded the workout.
 
 ## Workout Image Archive
 

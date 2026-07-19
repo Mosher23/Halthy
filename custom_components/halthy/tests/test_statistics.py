@@ -245,6 +245,106 @@ class StatisticsHelpersTests(unittest.TestCase):
             datetime(2026, 4, 2, 0, 0, 0, tzinfo=timezone.utc),
         )
 
+    def test_workout_calendar_record_normalizes_title_and_times(self) -> None:
+        record = BRIDGE._workout_record_from_attributes(
+            {
+                "workout_uuid": "ABCD-1234",
+                "workout_type": "HKWorkoutActivityTypeOutdoorCycling",
+                "workout_start": "2026-04-01T10:00:00Z",
+                "workout_end": "2026-04-01T11:15:00Z",
+                "workout_distance_m": 25000,
+            }
+        )
+
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertEqual(record.record_id, "uuid:abcd-1234")
+        self.assertEqual(record.uid, "ABCD-1234")
+        self.assertEqual(record.summary, "Outdoor Cycling")
+        self.assertEqual(record.start, datetime(2026, 4, 1, 10, tzinfo=timezone.utc))
+        self.assertEqual(record.end, datetime(2026, 4, 1, 11, 15, tzinfo=timezone.utc))
+
+    def test_workout_calendar_record_uses_timestamp_and_duration_fallback(self) -> None:
+        record = BRIDGE._workout_record_from_attributes(
+            {
+                "workout_type": "walking",
+                "measurement_timestamp": "2026-04-01T11:00:00Z",
+                "workout_duration_s": 1800,
+            }
+        )
+
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertEqual(record.summary, "Walking")
+        self.assertEqual(record.start, datetime(2026, 4, 1, 10, 30, tzinfo=timezone.utc))
+        self.assertEqual(record.end, datetime(2026, 4, 1, 11, tzinfo=timezone.utc))
+
+    def test_workout_calendar_upsert_deduplicates_by_uuid(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester",
+            app_username="tester",
+            display_name="Tester",
+        )
+        original = {
+            "workout_uuid": "same-workout",
+            "workout_type": "walking",
+            "workout_start": "2026-04-01T10:00:00Z",
+            "workout_end": "2026-04-01T10:30:00Z",
+            "avg_heart_rate_bpm": 123,
+        }
+
+        self.assertEqual(BRIDGE._upsert_workout_record(runtime, original), "created")
+        self.assertEqual(BRIDGE._upsert_workout_record(runtime, original), "duplicate")
+        self.assertEqual(
+            BRIDGE._upsert_workout_record(runtime, {**original, "workout_type": "hiking"}),
+            "updated",
+        )
+        self.assertEqual(len(runtime.workouts), 1)
+        updated = next(iter(runtime.workouts.values()))
+        self.assertEqual(updated.summary, "Hiking")
+        self.assertEqual(updated.metadata["avg_heart_rate_bpm"], 123)
+
+    def test_workout_calendar_upsert_migrates_fallback_identity_to_uuid(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester",
+            app_username="tester",
+            display_name="Tester",
+        )
+        workout = {
+            "workout_type": "walking",
+            "workout_start": "2026-04-01T10:00:00Z",
+            "workout_end": "2026-04-01T10:30:00Z",
+        }
+        self.assertEqual(BRIDGE._upsert_workout_record(runtime, workout), "created")
+
+        self.assertEqual(
+            BRIDGE._upsert_workout_record(
+                runtime,
+                {**workout, "workout_uuid": "new-stable-id"},
+            ),
+            "updated",
+        )
+        self.assertEqual(set(runtime.workouts), {"uuid:new-stable-id"})
+
+    def test_workout_calendar_storage_round_trip(self) -> None:
+        record = BRIDGE._workout_record_from_attributes(
+            {
+                "workout_uuid": "round-trip",
+                "workout_type": "running",
+                "workout_start": "2026-04-02T06:00:00Z",
+                "workout_end": "2026-04-02T06:45:00Z",
+                "workout_active_energy_kcal": 420,
+            }
+        )
+
+        self.assertIsNotNone(record)
+        assert record is not None
+        restored = BRIDGE._workout_from_storage(
+            record.record_id,
+            BRIDGE._workout_to_storage(record),
+        )
+        self.assertEqual(restored, record)
+
     def test_collect_workout_archive_records_includes_legacy_folders(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             media_root = pathlib.Path(temp_dir)

@@ -10,6 +10,7 @@
   ],
   "config_flow": true,
   "dependencies": [
+    "calendar",
     "http"
   ],
   "documentation": "https://github.com/Mosher23/Halthy",

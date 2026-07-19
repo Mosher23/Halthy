@@ -23,6 +23,7 @@ Halthy does not operate a central backend. Health, workout, and route data are s
 - Human-readable metric names with metric-specific icons and standardized units
 - Workout route map support (`image.*` entities)
 - Workout image archive in Home Assistant media storage with same-workout replacement
+- Read-only Home Assistant workout calendar for every configured person
 - Optional Home Assistant activity logbook integration (configurable)
 - Optional import from Home Assistant sensors back into HealthKit (in app)
 - Optional raw export to InfluxDB for long-range history and Grafana dashboards
@@ -40,6 +41,7 @@ Halthy does not operate a central backend. Health, workout, and route data are s
    - selected metric keys
    - `sensors[]` values and attributes
    - optional `images[]` route maps
+   - optional `workouts[]` calendar metadata
 3. The integration creates or updates:
    - `sensor.<app_username>_<metric_key>`
    - `image.<app_username>_workout`
@@ -111,6 +113,23 @@ user: your_username
 ```
 
 The card visual editor can auto-detect configured Halthy users and suggest them for selection.
+
+## 📅 Workout Calendar
+
+Halthy creates one read-only Home Assistant calendar for each configured person:
+
+- Entity ID: `calendar.<username>_workouts`
+- Each HealthKit workout is shown at its actual start and end time.
+- Event titles use readable workout types such as `Walking`, `Cycling`, or `Strength Training`.
+- Event details can include duration, distance, active energy, average heart rate, cadence, and speed when HealthKit provides them.
+- Multiple workouts on the same day remain separate calendar events.
+- Re-uploading a workout updates the existing event using its HealthKit workout UUID instead of creating a duplicate.
+
+Workout calendar metadata is stored independently from route-map images. Calendar entries therefore remain available when an old image is removed by the workout image retention setting, and workouts without route maps can also appear.
+
+After installing compatible versions of both the integration and iOS app, unlock the iPhone and run a foreground upload or **Force upload** once. The app sends the available HealthKit workout history in bounded batches. Existing route-map archive metadata is also imported automatically when the integration starts.
+
+Add `calendar.<username>_workouts` to Home Assistant's Calendar dashboard to display the workouts. The calendar is read-only because Apple Health remains the source of truth.
 
 ## 🗃️ Workout Image Archive
 
