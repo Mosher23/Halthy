@@ -191,7 +191,15 @@ def _load_integration_module():
         sys.modules[package_name] = package
 
     base_path = pathlib.Path(__file__).resolve().parents[1]
-    for module_base in ("const", "naming", "units"):
+    for module_base in (
+        "const",
+        "naming",
+        "units",
+        "runtime",
+        "timestamps",
+        "statistics",
+        "workout_archive",
+    ):
         module_name = f"{package_name}.{module_base}"
         if module_name in sys.modules:
             continue
@@ -200,7 +208,20 @@ def _load_integration_module():
         assert spec and spec.loader
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
+        if module_base == "runtime":
+            original_dataclass = dataclasses.dataclass
+
+            def _runtime_compat_dataclass(*args, **kwargs):
+                kwargs.pop("slots", None)
+                return original_dataclass(*args, **kwargs)
+
+            dataclasses.dataclass = _runtime_compat_dataclass  # type: ignore[assignment]
+            try:
+                spec.loader.exec_module(module)
+            finally:
+                dataclasses.dataclass = original_dataclass  # type: ignore[assignment]
+        else:
+            spec.loader.exec_module(module)
 
     module_name = f"{package_name}.bridge"
     if module_name in sys.modules:

@@ -11,13 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import (
     FORCE_UPLOAD_INTERVAL_OPTIONS,
-    IntegrationRuntime,
     async_update_force_upload_interval,
     force_upload_interval_label,
     force_upload_interval_seconds_from_label,
 )
 from .const import DOMAIN, MANUFACTURER
 from .naming import sanitize_identifier
+from .runtime import IntegrationRuntime
 
 
 async def async_setup_entry(

@@ -13,7 +13,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import HalthyWorkoutRecord, IntegrationRuntime
+from .runtime import HalthyWorkoutRecord, IntegrationRuntime
 from .const import DOMAIN, MANUFACTURER, workout_calendar_updated_signal
 from .naming import sanitize_identifier
 

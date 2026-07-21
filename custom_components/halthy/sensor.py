@@ -16,7 +16,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import HalthySensorState, IntegrationRuntime
+from .runtime import HalthySensorState, IntegrationRuntime
 from .const import (
     DOMAIN,
     MANUFACTURER,

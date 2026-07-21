@@ -13,7 +13,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import HalthyImageState, IntegrationRuntime
+from .runtime import HalthyImageState, IntegrationRuntime
 from .const import (
     DOMAIN,
     MANUFACTURER,

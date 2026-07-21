@@ -12,11 +12,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import (
     FORCE_INFLUX_BACKFILL_COMMAND_TYPE,
     FORCE_UPLOAD_COMMAND_TYPE,
-    IntegrationRuntime,
     async_queue_remote_command,
 )
 from .const import DOMAIN, MANUFACTURER
 from .naming import sanitize_identifier
+from .runtime import IntegrationRuntime
 
 
 async def async_setup_entry(
