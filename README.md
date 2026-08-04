@@ -1,7 +1,4 @@
 
-<a href="https://www.buymeacoffee.com/sergiit" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>   [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/O5O81W9KPE)   [![Donate with PayPal](https://www.paypalobjects.com/en_US/DK/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=UGG7JC4WCZFEY)
-
-
 # <img width="30" height="30" alt="Halthy icon" src="custom_components/halthy/brand/icon.png" /> Halthy
 Home Assistant custom integration for the Halthy app.
 
