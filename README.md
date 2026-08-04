@@ -18,7 +18,7 @@ Halthy does not operate a central backend. Health, workout, and route data are s
 
 - Direct push from iPhone to Home Assistant via `POST /api/halthy/push`
 - Per-person setup with stable unique IDs and predictable entity IDs
-- Human-readable metric names with metric-specific icons and standardized units
+- Readable metric names with metric-specific icons and standardized units
 - Workout route map support (`image.*` entities)
 - Workout image archive in Home Assistant media storage with same-workout replacement
 - Read-only Home Assistant workout calendar for every configured person
