@@ -1375,6 +1375,7 @@ class HalthyPushView(HomeAssistantView):
 
         raw_device_id = str(payload.get("device_id", "")).strip()
         device_id = raw_device_id or username
+        connection_test = payload.get("connection_test") is True
 
         prune_unselected_metrics = payload.get("prune_unselected_metrics") is True
         selected_metric_keys_payload = payload.get("selected_metric_keys")
@@ -1431,7 +1432,13 @@ class HalthyPushView(HomeAssistantView):
                 },
                 status=413,
             )
-        if not sensors_payload and not images_payload and not workouts_payload and not prune_unselected_metrics:
+        if (
+            not sensors_payload
+            and not images_payload
+            and not workouts_payload
+            and not prune_unselected_metrics
+            and not connection_test
+        ):
             return web.json_response({"error": "missing_sensors"}, status=400)
 
         request_user = request.get("hass_user")
@@ -1568,7 +1575,13 @@ class HalthyPushView(HomeAssistantView):
             if _workout_record_from_attributes(workout) is not None:
                 prepared_workouts.append(workout)
 
-        if not prepared_sensors and not prepared_images and not prepared_workouts and not prune_unselected_metrics:
+        if (
+            not prepared_sensors
+            and not prepared_images
+            and not prepared_workouts
+            and not prune_unselected_metrics
+            and not connection_test
+        ):
             return web.json_response({"error": "no_valid_sensors"}, status=400)
 
         normalized_username = _sanitize(username)
@@ -1597,6 +1610,15 @@ class HalthyPushView(HomeAssistantView):
                     "message": f"Username '{username}' is bound to a different Home Assistant user",
                 },
                 status=403,
+            )
+
+        if connection_test:
+            return web.json_response(
+                {
+                    "ok": True,
+                    "connection_test": True,
+                    "entry_id": target_entries[0][0],
+                }
             )
 
         for prepared_image in prepared_images:

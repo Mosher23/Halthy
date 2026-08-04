@@ -6,6 +6,8 @@
 
 Halthy is a Home Assistant custom integration that receives health metrics from the Halthy app and creates per-user entities with stable unique identifiers.
 
+Project documentation and privacy information are available in the repository root: [`../../README.md`](../../README.md) and [`../../PRIVACY.md`](../../PRIVACY.md). For support, use the [GitHub issue tracker](https://github.com/Mosher23/Halthy/issues).
+
 ## What This Integration Provides
 
 - Receives app uploads at `POST /api/halthy/push`

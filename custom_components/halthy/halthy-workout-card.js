@@ -3267,6 +3267,6 @@ if (!window.customCards.find((card) => card.type === "halthy-workout-card")) {
     description:
       "Shows the latest workout by default and opens a calendar popup with highlighted workout days.",
     preview: true,
-    documentationURL: "https://github.com/Mosher23/Halthy-Bridge",
+    documentationURL: "https://github.com/Mosher23/Halthy",
   });
 }
