@@ -95,6 +95,8 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 
 Halthy bundles a Lovelace card: `custom:halthy-workout-card`.
 
+![Halthy workout card showing a workout route and summary metrics](docs/images/workout-card.png)
+
 - The integration auto-registers the card module at startup.
 - In most setups you can use the card immediately in dashboard YAML without adding a manual resource.
 - If your frontend cache is stale, hard refresh the browser.
