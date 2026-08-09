@@ -16,7 +16,7 @@ from . import (
 )
 from .const import DOMAIN, MANUFACTURER
 from .naming import sanitize_identifier
-from .runtime import IntegrationRuntime
+from .runtime import IntegrationRuntime, runtime_device_identifiers
 
 
 async def async_setup_entry(
@@ -31,6 +31,7 @@ async def async_setup_entry(
         [
             HalthyCommandButton(
                 runtime=runtime,
+                entry_id=entry.entry_id,
                 command_type=FORCE_UPLOAD_COMMAND_TYPE,
                 title="Force upload",
                 object_suffix="force_upload",
@@ -38,6 +39,7 @@ async def async_setup_entry(
             ),
             HalthyCommandButton(
                 runtime=runtime,
+                entry_id=entry.entry_id,
                 command_type=FORCE_INFLUX_BACKFILL_COMMAND_TYPE,
                 title="Update InfluxDB",
                 object_suffix="force_influx_backfill",
@@ -55,6 +57,7 @@ class HalthyCommandButton(ButtonEntity):
     def __init__(
         self,
         runtime: IntegrationRuntime,
+        entry_id: str,
         command_type: str,
         title: str,
         object_suffix: str,
@@ -63,7 +66,7 @@ class HalthyCommandButton(ButtonEntity):
         self._runtime = runtime
         self._command_type = command_type
         username = sanitize_identifier(runtime.configured_username)
-        self._attr_unique_id = f"{DOMAIN}_{username}_{object_suffix}"
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_{object_suffix}"
         self._attr_suggested_object_id = f"{username}_{object_suffix}"
         self._attr_name = title
         self._attr_icon = icon
@@ -71,9 +74,8 @@ class HalthyCommandButton(ButtonEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        device_key = f"user:{self._runtime.configured_username}"
         return DeviceInfo(
-            identifiers={(DOMAIN, device_key)},
+            identifiers=runtime_device_identifiers(self._runtime),
             manufacturer=MANUFACTURER,
             model="iOS App",
             name=self._runtime.display_name,

@@ -10,6 +10,9 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 
 - Home Assistant integration documentation: [`custom_components/halthy/README.md`](custom_components/halthy/README.md)
 - Privacy policy: [`PRIVACY.md`](PRIVACY.md)
+- Security policy: [`SECURITY.md`](SECURITY.md)
+- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Release history: [`CHANGELOG.md`](CHANGELOG.md)
 - Support and issue tracker: [GitHub Issues](https://github.com/Mosher23/Halthy/issues)
 
 Halthy does not operate a central backend. Health, workout, and route data are sent only to user-configured destinations such as Home Assistant and optional InfluxDB. The iOS app stores access tokens in Keychain and uses HealthKit permissions only for selected app functionality.
@@ -95,7 +98,9 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
 
 Halthy bundles a Lovelace card: `custom:halthy-workout-card`.
 
-![Halthy workout card showing a workout route and summary metrics](docs/images/workout-card.png)
+![Halthy workout card showing a fictional route and sample metrics](docs/images/workout-card.png)
+
+The screenshot uses a fictional route and fabricated sample values; it contains no user health or location data.
 
 - The integration auto-registers the card module at startup.
 - In most setups you can use the card immediately in dashboard YAML without adding a manual resource.
@@ -125,7 +130,7 @@ Halthy creates one read-only Home Assistant calendar for each configured person:
 - Multiple workouts on the same day remain separate calendar events.
 - Re-uploading a workout updates the existing event using its HealthKit workout UUID instead of creating a duplicate.
 
-Workout calendar metadata is stored independently from route-map images. Calendar entries therefore remain available when an old image is removed by the workout image retention setting, and workouts without route maps can also appear.
+Workout calendar metadata is stored independently from route-map image files, so workouts without route maps can also appear. Both calendar metadata and archived images are bounded by the per-person retention setting to prevent unbounded Home Assistant storage growth.
 
 After installing compatible versions of both the integration and iOS app, unlock the iPhone and run a foreground upload or **Force upload** once. The app sends the available HealthKit workout history in bounded batches. Existing route-map archive metadata is also imported automatically when the integration starts.
 
@@ -169,7 +174,9 @@ You can change the configured **Username** and **Display Name** for an existing 
 
 - The username is the routing key used by `/api/halthy/push`, command polling, services, and the workout archive.
 - After changing it in Home Assistant, update the username in the iOS app to match.
-- Existing entities may keep their old entity IDs until Home Assistant or the entity registry renames them, but new data is routed through the updated username.
+- On reload, Halthy moves archived workout files to the new username folder and updates stored archive references.
+- Sensor and image entity IDs are migrated when the target ID is available. Configuration controls retain stable internal IDs across username changes.
+- Home Assistant recorder statistic IDs contain the username. Changing it starts new `halthy:*` statistic series; existing historical series remain in the recorder.
 
 ### 📊 Historical Statistics
 
@@ -197,6 +204,10 @@ Controls what Halthy writes to Home Assistant Logbook:
 | `Off` | No Logbook entries |
 | `Session summary` | One summary entry per sync session (updated/removed counts) |
 | `Per-entity verbose` | Per-entity update/remove entries |
+
+### 🗄️ Stored Workouts and Images
+
+Controls the maximum number of workout calendar records and route images retained for this person. The default is 250 and the supported range is 25 to 2,000. The oldest records and images are removed first.
 
 ## 📱 iOS App Setup
 
@@ -310,3 +321,7 @@ Use this when you want:
 - **Push works but history looks sparse**: Home Assistant external statistics are hourly; use InfluxDB for raw high-resolution history.
 - **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.
 - **Sensors not updating**: verify the username in the app exactly matches the integration Username.
+
+## 📄 License
+
+Halthy is available under the [MIT License](LICENSE).

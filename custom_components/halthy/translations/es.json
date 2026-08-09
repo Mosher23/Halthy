@@ -28,13 +28,30 @@
           "name": "Nombre visible (opcional)",
           "temperature_unit": "Unidad de temperatura",
           "activity_log_mode": "Modo de registro de actividad",
-          "statistics_enabled": "Importar estadisticas historicas"
+          "statistics_enabled": "Importar estadisticas historicas",
+          "workout_archive_retention": "Entrenamientos e imágenes almacenados"
         }
       }
     },
     "error": {
       "invalid_username": "Introduce un nombre de usuario valido.",
       "already_configured": "Este nombre de usuario ya esta configurado."
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "Desactivado",
+        "session_summary": "Resumen de sesión",
+        "per_entity_verbose": "Detallado por entidad"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "Usar el sistema de unidades de Home Assistant",
+        "celsius": "Usar siempre Celsius (°C)",
+        "fahrenheit": "Usar siempre Fahrenheit (°F)"
+      }
     }
   }
 }

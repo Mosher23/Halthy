@@ -28,13 +28,30 @@
           "name": "表示名（任意）",
           "temperature_unit": "温度単位",
           "activity_log_mode": "アクティビティログモード",
-          "statistics_enabled": "履歴統計をインポート"
+          "statistics_enabled": "履歴統計をインポート",
+          "workout_archive_retention": "保存するワークアウトと画像"
         }
       }
     },
     "error": {
       "invalid_username": "有効なユーザー名を入力してください。",
       "already_configured": "このユーザー名はすでに設定されています。"
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "オフ",
+        "session_summary": "セッション概要",
+        "per_entity_verbose": "エンティティごとの詳細"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "Home Assistant の単位系を使用",
+        "celsius": "常に摂氏 (°C) を使用",
+        "fahrenheit": "常に華氏 (°F) を使用"
+      }
     }
   }
 }

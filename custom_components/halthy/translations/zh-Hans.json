@@ -28,13 +28,30 @@
           "name": "显示名称（可选）",
           "temperature_unit": "温度单位",
           "activity_log_mode": "活动日志模式",
-          "statistics_enabled": "导入历史统计"
+          "statistics_enabled": "导入历史统计",
+          "workout_archive_retention": "存储的锻炼和图像"
         }
       }
     },
     "error": {
       "invalid_username": "请输入有效的用户名。",
       "already_configured": "此用户名已配置。"
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "关闭",
+        "session_summary": "会话摘要",
+        "per_entity_verbose": "按实体详细记录"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "使用 Home Assistant 单位系统",
+        "celsius": "始终使用摄氏度 (°C)",
+        "fahrenheit": "始终使用华氏度 (°F)"
+      }
     }
   }
 }

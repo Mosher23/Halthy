@@ -28,13 +28,30 @@
           "name": "Відображувана назва (необов'язково)",
           "temperature_unit": "Одиниця температури",
           "activity_log_mode": "Режим журналу активності",
-          "statistics_enabled": "Імпортувати історичну статистику"
+          "statistics_enabled": "Імпортувати історичну статистику",
+          "workout_archive_retention": "Збережені тренування та зображення"
         }
       }
     },
     "error": {
       "invalid_username": "Введіть дійсне ім'я користувача.",
       "already_configured": "Це ім'я користувача вже налаштовано."
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "Вимкнено",
+        "session_summary": "Підсумок сеансу",
+        "per_entity_verbose": "Докладно для кожної сутності"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "Використовувати систему одиниць Home Assistant",
+        "celsius": "Завжди використовувати Цельсій (°C)",
+        "fahrenheit": "Завжди використовувати Фаренгейт (°F)"
+      }
     }
   }
 }

@@ -29,13 +29,29 @@
           "temperature_unit": "Temperature unit",
           "activity_log_mode": "Activity log mode",
           "statistics_enabled": "Import historical statistics",
-          "workout_archive_retention": "Stored workout images"
+          "workout_archive_retention": "Stored workouts and images"
         }
       }
     },
     "error": {
       "invalid_username": "Enter a valid username.",
       "already_configured": "This username is already configured."
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "Off",
+        "session_summary": "Session summary",
+        "per_entity_verbose": "Per-entity verbose"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "Use Home Assistant unit system",
+        "celsius": "Always use Celsius (°C)",
+        "fahrenheit": "Always use Fahrenheit (°F)"
+      }
     }
   }
 }

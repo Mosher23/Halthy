@@ -4,15 +4,18 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.13"
 
@@ -20,7 +23,7 @@ jobs:
         run: python -m compileall -q custom_components
 
       - name: Run integration regression tests
-        run: python custom_components/halthy/tests/test_statistics.py
+        run: python -m unittest discover custom_components/halthy/tests -p 'test_*.py'
 
       - name: Validate workout card JavaScript
         run: node --check custom_components/halthy/halthy-workout-card.js

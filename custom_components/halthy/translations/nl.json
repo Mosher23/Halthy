@@ -28,13 +28,30 @@
           "name": "Weergavenaam (optioneel)",
           "temperature_unit": "Temperatuureenheid",
           "activity_log_mode": "Activiteitlogboekmodus",
-          "statistics_enabled": "Historische statistieken importeren"
+          "statistics_enabled": "Historische statistieken importeren",
+          "workout_archive_retention": "Opgeslagen workouts en afbeeldingen"
         }
       }
     },
     "error": {
       "invalid_username": "Voer een geldige gebruikersnaam in.",
       "already_configured": "Deze gebruikersnaam is al geconfigureerd."
+    }
+  },
+  "selector": {
+    "activity_log_mode": {
+      "options": {
+        "off": "Uit",
+        "session_summary": "Sessiesamenvatting",
+        "per_entity_verbose": "Uitgebreid per entiteit"
+      }
+    },
+    "temperature_unit": {
+      "options": {
+        "home_assistant": "Home Assistant-eenhedensysteem gebruiken",
+        "celsius": "Altijd Celsius (°C) gebruiken",
+        "fahrenheit": "Altijd Fahrenheit (°F) gebruiken"
+      }
     }
   }
 }

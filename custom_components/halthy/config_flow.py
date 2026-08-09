@@ -271,20 +271,12 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(CONF_TEMPERATURE_UNIT, default=temperature_unit): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=[
-                            {
-                                "value": TEMPERATURE_UNIT_SYSTEM,
-                                "label": "Use Home Assistant unit system",
-                            },
-                            {
-                                "value": TEMPERATURE_UNIT_CELSIUS,
-                                "label": "Always use Celsius (°C)",
-                            },
-                            {
-                                "value": TEMPERATURE_UNIT_FAHRENHEIT,
-                                "label": "Always use Fahrenheit (°F)",
-                            },
+                            TEMPERATURE_UNIT_SYSTEM,
+                            TEMPERATURE_UNIT_CELSIUS,
+                            TEMPERATURE_UNIT_FAHRENHEIT,
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="temperature_unit",
                     )
                 ),
                 vol.Required(
@@ -293,20 +285,12 @@ class HalthyOptionsFlow(config_entries.OptionsFlow):
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=[
-                            {
-                                "value": ACTIVITY_LOG_MODE_OFF,
-                                "label": "Off",
-                            },
-                            {
-                                "value": ACTIVITY_LOG_MODE_SESSION_SUMMARY,
-                                "label": "Session summary",
-                            },
-                            {
-                                "value": ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
-                                "label": "Per-entity verbose",
-                            },
+                            ACTIVITY_LOG_MODE_OFF,
+                            ACTIVITY_LOG_MODE_SESSION_SUMMARY,
+                            ACTIVITY_LOG_MODE_PER_ENTITY_VERBOSE,
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,
+                        translation_key="activity_log_mode",
                     )
                 ),
                 vol.Required(

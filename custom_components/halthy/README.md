@@ -1,9 +1,8 @@
-
 # <img width="30" height="30" alt="Halthy icon" src="brand/icon.png" /> Halthy Home Assistant Integration
 
 Halthy is a Home Assistant custom integration that receives health metrics from the Halthy app and creates per-user entities with stable unique identifiers.
 
-Project documentation and privacy information are available in the repository root: [`../../README.md`](../../README.md) and [`../../PRIVACY.md`](../../PRIVACY.md). For support, use the [GitHub issue tracker](https://github.com/Mosher23/Halthy/issues).
+Project documentation, privacy information, and security reporting instructions are available in the repository root: [`../../README.md`](../../README.md), [`../../PRIVACY.md`](../../PRIVACY.md), and [`../../SECURITY.md`](../../SECURITY.md). For support, use the [GitHub issue tracker](https://github.com/Mosher23/Halthy/issues).
 
 ## What This Integration Provides
 
@@ -67,7 +66,7 @@ Each Halthy config entry creates `calendar.<username>_workouts`. Add this entity
 - Multiple workouts on one day are separate events.
 - HealthKit UUIDs prevent duplicates and allow later uploads to update an event.
 - Event descriptions include available summary values such as duration, distance, active energy, average heart rate, cadence, and speed.
-- Calendar metadata remains stored even when an old route image is pruned.
+- Calendar metadata and route images use the configured per-person retention limit to keep Home Assistant storage bounded.
 
 Unlock the iPhone and perform a foreground upload or **Force upload** once after upgrading the integration and app. The app uploads the available HealthKit workout history in bounded batches. Existing route archive metadata is migrated automatically during integration setup.
 
@@ -111,7 +110,9 @@ You can change the configured **Username** and **Display Name** for an existing 
 
 - The username is the routing key used by uploads, commands, services, and workout archive lookup.
 - After changing it in Home Assistant, update the username in the iOS app to match.
-- Existing entities may keep their old entity IDs until Home Assistant or the entity registry renames them.
+- Halthy moves archived workout files to the new username folder during reload and updates stored archive references.
+- Sensor and image entity IDs are migrated when the target ID is available. Configuration controls retain stable internal IDs.
+- Recorder statistic IDs contain the username, so a rename starts new `halthy:*` series without deleting the old history.
 
 ### Historical Statistics
 
@@ -134,6 +135,10 @@ Enable or disable **Import historical statistics** independently for each config
 | `Off` | No logbook entries |
 | `Session summary` | One summary log per sync session |
 | `Per-entity verbose` | Log entry for each updated/removed entity |
+
+### Stored Workouts and Images
+
+Sets the maximum number of workout calendar records and route images retained for this person. The default is 250 and the supported range is 25 to 2,000. Oldest data is removed first.
 
 ## Entities Created
 
@@ -184,3 +189,7 @@ These are external Home Assistant long-term statistics, so `halthy:*` statistic 
 - **`401` / `403` on upload**: verify long-lived token and user ownership for configured username.
 - **Entities not updating**: verify the app username exactly matches **Username** in the integration entry.
 - **History gaps in dashboards**: confirm payload includes `measurement_timestamp`; use InfluxDB when you need raw high-resolution history instead of hourly HA external statistics.
+
+## License
+
+Halthy is available under the [MIT License](../../LICENSE).

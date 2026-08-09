@@ -436,6 +436,78 @@ def _prune_workout_archive_files(archive_dir: Path, retention_limit: int) -> int
     return removed_count
 
 
+def migrate_workout_archive_username(
+    media_root: Path,
+    old_username: str,
+    new_username: str,
+) -> int:
+    """Move archived workout files when a configured username changes."""
+
+    old_username = sanitize_identifier(old_username)
+    new_username = sanitize_identifier(new_username)
+    if not old_username or not new_username or old_username == new_username:
+        return 0
+
+    migrated_count = 0
+    for archive_domain in WORKOUT_ARCHIVE_FOLDER_DOMAIN_CANDIDATES:
+        source_dir = media_root / archive_domain / "workouts" / old_username
+        target_dir = media_root / archive_domain / "workouts" / new_username
+        if not source_dir.exists() or not source_dir.is_dir() or source_dir.is_symlink():
+            continue
+
+        image_paths = [
+            path
+            for path in source_dir.rglob("*")
+            if path.is_file()
+            and not path.is_symlink()
+            and _is_supported_workout_archive_file(path)
+        ]
+        for source_image in image_paths:
+            try:
+                relative_path = source_image.relative_to(source_dir)
+            except ValueError:
+                continue
+            target_image = target_dir / relative_path
+            target_image.parent.mkdir(parents=True, exist_ok=True)
+
+            source_metadata = _workout_archive_metadata_path(source_image)
+            target_metadata = _workout_archive_metadata_path(target_image)
+            try:
+                keep_source = (
+                    not target_image.exists()
+                    or source_image.stat().st_mtime_ns >= target_image.stat().st_mtime_ns
+                )
+                if keep_source:
+                    source_image.replace(target_image)
+                    if source_metadata.exists() and not source_metadata.is_symlink():
+                        source_metadata.replace(target_metadata)
+                    migrated_count += 1
+                else:
+                    source_image.unlink()
+                    if source_metadata.exists() and not source_metadata.is_symlink():
+                        source_metadata.unlink()
+            except OSError as err:
+                _LOGGER.warning(
+                    "Failed to migrate workout archive file from '%s' to '%s': %s",
+                    old_username,
+                    new_username,
+                    err,
+                )
+
+        directories = sorted(
+            (path for path in source_dir.rglob("*") if path.is_dir()),
+            key=lambda path: len(path.parts),
+            reverse=True,
+        )
+        for directory in (*directories, source_dir):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+
+    return migrated_count
+
+
 async def _async_archive_workout_image(
     hass: HomeAssistant,
     username: str,

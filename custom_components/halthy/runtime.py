@@ -12,6 +12,7 @@ from .const import (
     DEFAULT_STATISTICS_ENABLED,
     DEFAULT_TEMPERATURE_UNIT,
     DEFAULT_WORKOUT_ARCHIVE_RETENTION,
+    DOMAIN,
 )
 
 
@@ -65,6 +66,7 @@ class IntegrationRuntime:
     configured_username: str
     app_username: str
     display_name: str
+    previous_configured_username: str | None = None
     owner_user_id: str | None = None
     temperature_unit_preference: str = DEFAULT_TEMPERATURE_UNIT
     activity_log_mode: str = DEFAULT_ACTIVITY_LOG_MODE
@@ -89,6 +91,15 @@ def runtime_lock(runtime: IntegrationRuntime) -> asyncio.Lock:
     if runtime.lock is None:
         runtime.lock = asyncio.Lock()
     return runtime.lock
+
+
+def runtime_device_identifiers(runtime: IntegrationRuntime) -> set[tuple[str, str]]:
+    """Return current and transitional identifiers for one person's device."""
+
+    usernames = {runtime.configured_username}
+    if runtime.previous_configured_username:
+        usernames.add(runtime.previous_configured_username)
+    return {(DOMAIN, f"user:{username}") for username in usernames if username}
 
 
 @dataclass(slots=True)

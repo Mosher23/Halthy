@@ -4,7 +4,6 @@ on:
   release:
     types:
       - published
-      - edited
 
 permissions:
   contents: write
@@ -15,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Build HACS release zip
         id: build_package
@@ -23,8 +24,9 @@ jobs:
           set -euo pipefail
           rm -rf dist halthy.zip
           mkdir -p dist/custom_components
-          cp -R custom_components/. dist/custom_components/
+          cp -R custom_components/halthy dist/custom_components/halthy
           cp dist/custom_components/halthy/README.md dist/README.md || true
+          cp LICENSE dist/LICENSE
           (
             cd dist
             zip -r ../halthy.zip .
@@ -32,7 +34,7 @@ jobs:
           echo "package_name=halthy.zip" >> "$GITHUB_OUTPUT"
 
       - name: Attach package to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: ${{ steps.build_package.outputs.package_name }}
           fail_on_unmatched_files: false

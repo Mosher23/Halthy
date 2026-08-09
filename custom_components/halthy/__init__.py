@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import asyncio
 import base64
 import binascii
 import hashlib
@@ -92,58 +91,28 @@ from .runtime import (
     runtime_lock as _runtime_lock,
 )
 from .statistics import (
-    STATISTICS_SOURCE,
     commit_statistics_cursor_updates as _commit_statistics_cursor_updates,
     import_statistics_batches,
-    numeric_state_value as _numeric_state_value,
     prepare_statistics_imports_for_runtime as _prepare_statistics_imports_for_runtime,
     statistics_candidates_from_sensor as _statistics_candidates_from_sensor,
-    statistics_data as _statistics_data,
-    statistics_friendly_name as _statistics_friendly_name,
-    statistics_hour_bucket as _statistics_hour_bucket,
-    statistics_id_for_metric as _statistics_id_for_metric,
-    statistics_metadata as _statistics_metadata,
-    statistics_source_for_id as _statistics_source_for_id,
 )
 from .timestamps import (
-    MEASUREMENT_TIMESTAMP_ATTRIBUTE_KEYS,
     measurement_timestamp_value as _measurement_timestamp_value,
     parse_measurement_timestamp as _parse_measurement_timestamp,
 )
 from .workout_archive import (
-    WORKOUT_ARCHIVE_DEFAULT_LIST_LIMIT,
     WORKOUT_ARCHIVE_FOLDER_DOMAIN_CANDIDATES,
     WORKOUT_ARCHIVE_ID_ATTRIBUTE_KEYS,
-    WORKOUT_ARCHIVE_IMAGE_SUFFIXES,
-    WORKOUT_ARCHIVE_MAX_LIST_LIMIT,
-    WORKOUT_ARCHIVE_METADATA_KEYS,
-    WORKOUT_ARCHIVE_TIMESTAMP_ATTRIBUTE_KEYS,
     WORKOUT_ARCHIVE_WORKOUT_TYPE_ATTRIBUTE_KEYS,
-    WORKOUT_IMAGE_CONTENT_TYPE_EXTENSIONS,
     WORKOUT_IMAGE_METRIC_KEY,
     _async_archive_workout_image,
     _async_collect_workout_archive_records,
     _coerce_workout_archive_limit,
-    _collect_workout_archive_records,
-    _image_extension_from_content_type,
-    _is_supported_workout_archive_file,
-    _normalize_requested_relative_path,
-    _prune_workout_archive_files,
-    _read_workout_archive_metadata,
     _resolve_workout_archive_file_path,
-    _safe_utc_datetime,
-    _store_workout_archive_file,
-    _store_workout_archive_metadata,
     _validated_image_content_type,
-    _workout_archive_file_name,
-    _workout_archive_fingerprint,
     _workout_archive_image_url,
     _workout_archive_metadata_from_attributes,
-    _workout_archive_metadata_path,
-    _workout_archive_metadata_value,
-    _workout_archive_record_identity,
-    _workout_archive_timestamp,
-    _workout_archive_timestamp_from_file_name,
+    migrate_workout_archive_username,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -870,6 +839,50 @@ def _upsert_workout_record(
     return "created" if existing is None else "updated"
 
 
+def _prune_runtime_workouts(runtime: IntegrationRuntime, retention_limit: int) -> int:
+    """Keep persisted calendar metadata bounded to the configured retention."""
+
+    retention_limit = _coerce_workout_archive_retention(retention_limit)
+    ordered_ids = sorted(
+        runtime.workouts,
+        key=lambda record_id: (
+            runtime.workouts[record_id].end,
+            runtime.workouts[record_id].start,
+            record_id,
+        ),
+        reverse=True,
+    )
+    removed_count = 0
+    for record_id in ordered_ids[retention_limit:]:
+        runtime.workouts.pop(record_id, None)
+        removed_count += 1
+    return removed_count
+
+
+def _rewrite_archive_username_attributes(
+    attributes: dict[str, Any],
+    old_username: str,
+    new_username: str,
+) -> dict[str, Any]:
+    """Update stored archive references after moving a username directory."""
+
+    updated = dict(attributes)
+    for key in (
+        "archive_relative_path",
+        "archive_local_url",
+        "archive_media_source_id",
+    ):
+        value = updated.get(key)
+        if not isinstance(value, str):
+            continue
+        for archive_domain in WORKOUT_ARCHIVE_FOLDER_DOMAIN_CANDIDATES:
+            old_fragment = f"{archive_domain}/workouts/{old_username}/"
+            new_fragment = f"{archive_domain}/workouts/{new_username}/"
+            value = value.replace(old_fragment, new_fragment)
+        updated[key] = value
+    return updated
+
+
 def _workout_to_storage(record: HalthyWorkoutRecord) -> dict[str, Any]:
     return {
         "record_id": record.record_id,
@@ -1349,25 +1362,25 @@ class HalthyPushView(HomeAssistantView):
             )
 
         try:
-            payload = await request.json()
-        except ValueError:
+            request_body = await request.read()
+        except web.HTTPRequestEntityTooLarge:
+            return web.json_response(
+                {"error": "payload_too_large", "message": f"Request exceeds {MAX_REQUEST_BYTES} bytes"},
+                status=413,
+            )
+        if len(request_body) > MAX_REQUEST_BYTES:
+            return web.json_response(
+                {"error": "payload_too_large", "message": f"Request exceeds {MAX_REQUEST_BYTES} bytes"},
+                status=413,
+            )
+
+        try:
+            payload = json.loads(request_body)
+        except (UnicodeDecodeError, ValueError):
             return web.json_response({"error": "invalid_json"}, status=400)
 
         if not isinstance(payload, dict):
             return web.json_response({"error": "invalid_payload"}, status=400)
-        if request_size <= 0:
-            try:
-                encoded_payload = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-            except (TypeError, ValueError):
-                return web.json_response({"error": "invalid_payload"}, status=400)
-            if len(encoded_payload.encode("utf-8")) > MAX_REQUEST_BYTES:
-                return web.json_response(
-                    {
-                        "error": "payload_too_large",
-                        "message": f"Request exceeds {MAX_REQUEST_BYTES} bytes",
-                    },
-                    status=413,
-                )
 
         username = str(payload.get("username", "")).strip()
         if not username:
@@ -1696,6 +1709,9 @@ class HalthyPushView(HomeAssistantView):
                             if entry_last_update_at is None or workout_record.end > entry_last_update_at:
                                 entry_last_update_at = workout_record.end
                         entry_has_state_update = True
+
+                if _prune_runtime_workouts(runtime, runtime.workout_archive_retention):
+                    workout_calendar_changed = True
 
                 for prepared_sensor in prepared_sensors:
                     metric_key = prepared_sensor["metric_key"]
@@ -2613,6 +2629,49 @@ def _ensure_http_views_registered(
     domain_data["view_registered"] = any_registered
 
 
+def _migrate_control_entity_unique_ids(registry: Any, entry_id: str) -> None:
+    """Replace username-based control IDs with stable config-entry IDs."""
+
+    suffixes_by_domain = {
+        "button": ("force_upload", "force_influx_backfill"),
+        "select": ("force_upload_interval",),
+    }
+    for registry_entry in er.async_entries_for_config_entry(registry, entry_id):
+        suffixes = suffixes_by_domain.get(registry_entry.domain)
+        unique_id = str(registry_entry.unique_id or "")
+        if not suffixes or not unique_id.startswith(f"{DOMAIN}_"):
+            continue
+        suffix = next(
+            (candidate for candidate in suffixes if unique_id.endswith(f"_{candidate}")),
+            None,
+        )
+        if suffix is None:
+            continue
+        desired_unique_id = f"{DOMAIN}_{entry_id}_{suffix}"
+        if unique_id == desired_unique_id:
+            continue
+
+        existing_entity_id = registry.async_get_entity_id(
+            registry_entry.domain,
+            DOMAIN,
+            desired_unique_id,
+        )
+        if existing_entity_id is not None:
+            registry.async_remove(registry_entry.entity_id)
+            continue
+        try:
+            registry.async_update_entity(
+                registry_entry.entity_id,
+                new_unique_id=desired_unique_id,
+            )
+        except ValueError:
+            _LOGGER.debug(
+                "Unable to migrate Halthy control unique ID '%s' to '%s'",
+                unique_id,
+                desired_unique_id,
+            )
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up domain storage."""
     store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
@@ -2837,8 +2896,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     stored_username = stored_entry.get("configured_username")
+    previous_configured_usernames: set[str] = set()
     if not entry_app_username and isinstance(stored_username, str) and stored_username.strip():
         configured_username = _sanitize(stored_username)
+    elif isinstance(stored_username, str) and stored_username.strip():
+        previous_username = _sanitize(stored_username)
+        if previous_username and previous_username != configured_username:
+            previous_configured_usernames.add(previous_username)
+
+    stored_images = stored_entry.get("images", {})
+    if isinstance(stored_images, dict):
+        for raw_image in stored_images.values():
+            if not isinstance(raw_image, dict):
+                continue
+            previous_username = _sanitize(str(raw_image.get("username") or ""))
+            if previous_username and previous_username != configured_username:
+                previous_configured_usernames.add(previous_username)
 
     stored_owner_user_id = stored_entry.get("owner_user_id")
     if isinstance(stored_owner_user_id, str) and stored_owner_user_id.strip():
@@ -2875,6 +2948,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         configured_username=configured_username,
         app_username=app_username,
         display_name=display_name,
+        previous_configured_username=next(iter(sorted(previous_configured_usernames)), None),
         owner_user_id=owner_user_id,
         temperature_unit_preference=temperature_unit_preference,
         activity_log_mode=activity_log_mode,
@@ -2895,14 +2969,43 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if restored is not None:
                 runtime.sensors[unique_id] = restored
 
-    stored_images = stored_entry.get("images", {})
+    if previous_configured_usernames:
+        media_root = Path(hass.config.path("media"))
+        migrated_archive_files = 0
+        for previous_username in sorted(previous_configured_usernames):
+            migrated_archive_files += await hass.async_add_executor_job(
+                migrate_workout_archive_username,
+                media_root,
+                previous_username,
+                configured_username,
+            )
+        if migrated_archive_files:
+            _LOGGER.info(
+                "Migrated %s workout archive file(s) to username '%s'",
+                migrated_archive_files,
+                configured_username,
+            )
+
     if isinstance(stored_images, dict):
         media_root = Path(hass.config.path("media"))
         for unique_id, raw_image in stored_images.items():
+            if not isinstance(raw_image, dict):
+                continue
+            migrated_raw_image = dict(raw_image)
+            raw_attributes = migrated_raw_image.get("attributes")
+            migrated_attributes = raw_attributes if isinstance(raw_attributes, dict) else {}
+            for previous_username in previous_configured_usernames:
+                migrated_attributes = _rewrite_archive_username_attributes(
+                    migrated_attributes,
+                    previous_username,
+                    configured_username,
+                )
+            migrated_raw_image["attributes"] = migrated_attributes
+            migrated_raw_image["username"] = app_username
             restored = await hass.async_add_executor_job(
                 _image_from_storage,
                 unique_id,
-                raw_image,
+                migrated_raw_image,
                 media_root,
             )
             if restored is not None:
@@ -2924,6 +3027,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         migrated = _workout_record_from_attributes(archived_workout)
         if migrated is not None and migrated.record_id not in runtime.workouts:
             runtime.workouts[migrated.record_id] = migrated
+    _prune_runtime_workouts(runtime, runtime.workout_archive_retention)
 
     stored_statistics_cursors = stored_entry.get("statistics_cursors", {})
     if isinstance(stored_statistics_cursors, dict):
@@ -2969,6 +3073,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _reschedule_daily_upload_reset(hass, entry.entry_id)
 
     registry = er.async_get(hass)
+    _migrate_control_entity_unique_ids(registry, entry.entry_id)
     legacy_tracker_entity_ids = [
         registry_entry.entity_id
         for registry_entry in er.async_entries_for_config_entry(registry, entry.entry_id)

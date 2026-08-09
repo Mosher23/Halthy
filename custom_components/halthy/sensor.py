@@ -16,7 +16,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .runtime import HalthySensorState, IntegrationRuntime
+from .runtime import HalthySensorState, IntegrationRuntime, runtime_device_identifiers
 from .const import (
     DOMAIN,
     MANUFACTURER,
@@ -163,9 +163,8 @@ class HalthySensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        device_key = f"user:{self._runtime.configured_username}"
         return DeviceInfo(
-            identifiers={(DOMAIN, device_key)},
+            identifiers=runtime_device_identifiers(self._runtime),
             manufacturer=MANUFACTURER,
             model="iOS App",
             name=self._runtime.display_name,

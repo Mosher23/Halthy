@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import os
 import pathlib
@@ -225,7 +225,12 @@ def _load_integration_module():
 
     module_name = f"{package_name}.bridge"
     if module_name in sys.modules:
-        return sys.modules[module_name]
+        return (
+            sys.modules[module_name],
+            sys.modules[f"{package_name}.workout_archive"],
+            sys.modules[f"{package_name}.statistics"],
+            sys.modules[f"{package_name}.timestamps"],
+        )
 
     module_path = base_path / "__init__.py"
     spec = importlib.util.spec_from_file_location(module_name, module_path)
@@ -245,24 +250,29 @@ def _load_integration_module():
         spec.loader.exec_module(module)
     finally:
         dataclasses.dataclass = original_dataclass  # type: ignore[assignment]
-    return module
+    return (
+        module,
+        sys.modules[f"{package_name}.workout_archive"],
+        sys.modules[f"{package_name}.statistics"],
+        sys.modules[f"{package_name}.timestamps"],
+    )
 
 
-BRIDGE = _load_integration_module()
+BRIDGE, ARCHIVE, STATISTICS, TIMESTAMPS = _load_integration_module()
 
 
 class StatisticsHelpersTests(unittest.TestCase):
     def test_workout_archive_timestamp_from_file_name_formats(self) -> None:
         self.assertEqual(
-            BRIDGE._workout_archive_timestamp_from_file_name("20260323T123436Z_uuid_test.jpg"),
+            ARCHIVE._workout_archive_timestamp_from_file_name("20260323T123436Z_uuid_test.jpg"),
             datetime(2026, 3, 23, 12, 34, 36, tzinfo=timezone.utc),
         )
         self.assertEqual(
-            BRIDGE._workout_archive_timestamp_from_file_name("workout_2026-04-01_10-11-12_map.png"),
+            ARCHIVE._workout_archive_timestamp_from_file_name("workout_2026-04-01_10-11-12_map.png"),
             datetime(2026, 4, 1, 10, 11, 12, tzinfo=timezone.utc),
         )
         self.assertEqual(
-            BRIDGE._workout_archive_timestamp_from_file_name("route_20260402.jpg"),
+            ARCHIVE._workout_archive_timestamp_from_file_name("route_20260402.jpg"),
             datetime(2026, 4, 2, 0, 0, 0, tzinfo=timezone.utc),
         )
 
@@ -381,7 +391,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             os.utime(modern_file, (1711966272, 1711966272))
             os.utime(legacy_file, (1710765276, 1710765276))
 
-            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+            records = ARCHIVE._collect_workout_archive_records(media_root, "tester", limit=10)
 
             self.assertEqual(len(records), 2)
             self.assertEqual(records[0]["file_name"], "20260401T101112Z_uuid_modern.jpg")
@@ -407,13 +417,13 @@ class StatisticsHelpersTests(unittest.TestCase):
             os.utime(legacy_file, (1710765276, 1710765276))
             os.utime(modern_file, (1711966272, 1711966272))
 
-            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+            records = ARCHIVE._collect_workout_archive_records(media_root, "tester", limit=10)
 
             self.assertEqual(len(records), 1)
             self.assertIn("/halthy/workouts/tester/", records[0]["local_url"])
 
     def test_workout_archive_image_url_contains_no_access_token(self) -> None:
-        url = BRIDGE._workout_archive_image_url(
+        url = ARCHIVE._workout_archive_image_url(
             "tester_1",
             "halthy/workouts/tester_1/20260401T101112Z_uuid.jpg",
             "2026-04-01T10:11:13Z",
@@ -425,15 +435,15 @@ class StatisticsHelpersTests(unittest.TestCase):
 
     def test_image_content_type_requires_matching_signature(self) -> None:
         self.assertEqual(
-            BRIDGE._validated_image_content_type("image/jpeg", b"\xff\xd8\xffpayload"),
+            ARCHIVE._validated_image_content_type("image/jpeg", b"\xff\xd8\xffpayload"),
             "image/jpeg",
         )
         self.assertEqual(
-            BRIDGE._validated_image_content_type("image/png", b"\x89PNG\r\n\x1a\npayload"),
+            ARCHIVE._validated_image_content_type("image/png", b"\x89PNG\r\n\x1a\npayload"),
             "image/png",
         )
-        self.assertIsNone(BRIDGE._validated_image_content_type("image/jpeg", b"not-an-image"))
-        self.assertIsNone(BRIDGE._validated_image_content_type("image/svg+xml", b"<svg/>"))
+        self.assertIsNone(ARCHIVE._validated_image_content_type("image/jpeg", b"not-an-image"))
+        self.assertIsNone(ARCHIVE._validated_image_content_type("image/svg+xml", b"<svg/>"))
 
     def test_workout_archive_prunes_oldest_images_and_sidecars(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -442,16 +452,16 @@ class StatisticsHelpersTests(unittest.TestCase):
             for index in range(27):
                 image_path = archive_dir / f"workout_{index:02d}.jpg"
                 image_path.write_bytes(b"\xff\xd8\xffpayload")
-                BRIDGE._workout_archive_metadata_path(image_path).write_text("{}")
+                ARCHIVE._workout_archive_metadata_path(image_path).write_text("{}")
                 os.utime(image_path, (index + 1, index + 1))
                 image_paths.append(image_path)
 
-            removed = BRIDGE._prune_workout_archive_files(archive_dir, 25)
+            removed = ARCHIVE._prune_workout_archive_files(archive_dir, 25)
 
             self.assertEqual(removed, 2)
             self.assertFalse(image_paths[0].exists())
             self.assertFalse(image_paths[1].exists())
-            self.assertFalse(BRIDGE._workout_archive_metadata_path(image_paths[0]).exists())
+            self.assertFalse(ARCHIVE._workout_archive_metadata_path(image_paths[0]).exists())
             self.assertEqual(len(list(archive_dir.glob("*.jpg"))), 25)
             self.assertEqual(len(list(archive_dir.glob("*.json"))), 25)
 
@@ -460,9 +470,89 @@ class StatisticsHelpersTests(unittest.TestCase):
         self.assertEqual(BRIDGE._coerce_workout_archive_retention(1), 25)
         self.assertEqual(BRIDGE._coerce_workout_archive_retention(9000), 2000)
 
+    def test_runtime_workout_retention_keeps_newest_records(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester",
+            app_username="tester",
+            display_name="Tester",
+        )
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        for index in range(27):
+            result = BRIDGE._upsert_workout_record(
+                runtime,
+                {
+                    "workout_uuid": f"workout-{index}",
+                    "workout_type": "walking",
+                    "workout_start": (start + timedelta(days=index)).isoformat(),
+                    "workout_end": (start + timedelta(days=index, minutes=30)).isoformat(),
+                },
+            )
+            self.assertEqual(result, "created")
+
+        removed = BRIDGE._prune_runtime_workouts(runtime, 25)
+
+        self.assertEqual(removed, 2)
+        self.assertEqual(len(runtime.workouts), 25)
+        self.assertNotIn("uuid:workout-0", runtime.workouts)
+        self.assertNotIn("uuid:workout-1", runtime.workouts)
+        self.assertIn("uuid:workout-26", runtime.workouts)
+
+    def test_workout_archive_username_migration_moves_newest_file_and_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            media_root = pathlib.Path(temp_dir)
+            source_dir = media_root / "halthy" / "workouts" / "old_user"
+            target_dir = media_root / "halthy" / "workouts" / "new_user"
+            source_dir.mkdir(parents=True)
+            target_dir.mkdir(parents=True)
+            file_name = "20260401T101112Z_uuid_same.jpg"
+            source_image = source_dir / file_name
+            target_image = target_dir / file_name
+            source_image.write_bytes(b"newer")
+            target_image.write_bytes(b"older")
+            ARCHIVE._workout_archive_metadata_path(source_image).write_text(
+                '{"workout_type":"cycling"}',
+                encoding="utf-8",
+            )
+            os.utime(target_image, (1, 1))
+            os.utime(source_image, (2, 2))
+
+            migrated = ARCHIVE.migrate_workout_archive_username(
+                media_root,
+                "old_user",
+                "new_user",
+            )
+
+            self.assertEqual(migrated, 1)
+            self.assertFalse(source_image.exists())
+            self.assertEqual(target_image.read_bytes(), b"newer")
+            self.assertEqual(
+                ARCHIVE._read_workout_archive_metadata(target_image)["workout_type"],
+                "cycling",
+            )
+
+    def test_archive_attributes_follow_username_migration(self) -> None:
+        migrated = BRIDGE._rewrite_archive_username_attributes(
+            {
+                "archive_relative_path": "halthy/workouts/old_user/map.jpg",
+                "archive_local_url": "/media/local/halthy/workouts/old_user/map.jpg",
+                "archive_media_source_id": (
+                    "media-source://media_source/local/halthy/workouts/old_user/map.jpg"
+                ),
+            },
+            "old_user",
+            "new_user",
+        )
+
+        self.assertEqual(
+            migrated["archive_relative_path"],
+            "halthy/workouts/new_user/map.jpg",
+        )
+        self.assertNotIn("old_user", migrated["archive_local_url"])
+        self.assertNotIn("old_user", migrated["archive_media_source_id"])
+
     def test_workout_archive_file_name_uses_timestamp_and_workout_uuid(self) -> None:
         file_name, workout_fingerprint, workout_timestamp, extension = (
-            BRIDGE._workout_archive_file_name(
+            ARCHIVE._workout_archive_file_name(
                 metric_key="workout",
                 attributes={
                     "measurement_timestamp": "2026-03-28T18:15:12Z",
@@ -495,7 +585,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             old_same_workout_metadata.write_text("{}", encoding="utf-8")
             other_workout_file.write_bytes(b"other")
 
-            replaced_count = BRIDGE._store_workout_archive_file(
+            replaced_count = ARCHIVE._store_workout_archive_file(
                 archive_dir=archive_dir,
                 file_name="20260328T181520Z_uuid_abcd_1234.jpg",
                 image_bytes=b"new_image",
@@ -521,7 +611,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             file_name = "20260401T101112Z_uuid_abcd_1234.jpg"
             (archive_dir / file_name).write_bytes(b"image")
 
-            BRIDGE._store_workout_archive_metadata(
+            ARCHIVE._store_workout_archive_metadata(
                 archive_dir,
                 file_name,
                 {
@@ -547,7 +637,7 @@ class StatisticsHelpersTests(unittest.TestCase):
                 },
             )
 
-            records = BRIDGE._collect_workout_archive_records(media_root, "tester", limit=10)
+            records = ARCHIVE._collect_workout_archive_records(media_root, "tester", limit=10)
 
             self.assertEqual(records[0]["title"], "Walking")
             self.assertEqual(records[0]["workout_distance_m"], 1234.5)
@@ -571,7 +661,7 @@ class StatisticsHelpersTests(unittest.TestCase):
 
     def test_workout_archive_file_name_uses_timestamp_fallback_key(self) -> None:
         file_name, workout_fingerprint, workout_timestamp, extension = (
-            BRIDGE._workout_archive_file_name(
+            ARCHIVE._workout_archive_file_name(
                 metric_key="workout",
                 attributes={
                     "timestamp": "2026-04-04T07:01:02Z",
@@ -591,15 +681,15 @@ class StatisticsHelpersTests(unittest.TestCase):
         self.assertEqual(file_name, f"20260404T070102Z_{expected_fingerprint}.jpg")
 
     def test_numeric_state_value_accepts_numeric_strings_with_units(self) -> None:
-        self.assertEqual(BRIDGE._numeric_state_value("72"), 72.0)
-        self.assertEqual(BRIDGE._numeric_state_value("72,5"), 72.5)
-        self.assertEqual(BRIDGE._numeric_state_value("72 bpm"), 72.0)
-        self.assertEqual(BRIDGE._numeric_state_value("36.5 °C"), 36.5)
-        self.assertIsNone(BRIDGE._numeric_state_value("not-a-number"))
+        self.assertEqual(STATISTICS.numeric_state_value("72"), 72.0)
+        self.assertEqual(STATISTICS.numeric_state_value("72,5"), 72.5)
+        self.assertEqual(STATISTICS.numeric_state_value("72 bpm"), 72.0)
+        self.assertEqual(STATISTICS.numeric_state_value("36.5 °C"), 36.5)
+        self.assertIsNone(STATISTICS.numeric_state_value("not-a-number"))
 
     def test_measurement_timestamp_value_uses_fallback_keys(self) -> None:
         attrs = {"timestamp": "2026-04-02T10:11:12Z"}
-        self.assertEqual(BRIDGE._measurement_timestamp_value(attrs), "2026-04-02T10:11:12Z")
+        self.assertEqual(TIMESTAMPS.measurement_timestamp_value(attrs), "2026-04-02T10:11:12Z")
 
     def test_prepare_statistics_uses_top_of_hour_buckets(self) -> None:
         runtime = BRIDGE.IntegrationRuntime(
@@ -607,7 +697,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             app_username="tester",
             display_name="Tester",
         )
-        statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
+        statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
         candidates = [
             {
                 "statistic_id": statistic_id,
@@ -625,7 +715,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             },
         ]
 
-        batches, _cursor_updates = BRIDGE._prepare_statistics_imports_for_runtime(
+        batches, _cursor_updates = STATISTICS.prepare_statistics_imports_for_runtime(
             runtime, candidates
         )
         self.assertEqual(len(batches), 1)
@@ -644,7 +734,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             statistics_enabled=False,
         )
 
-        candidates = BRIDGE._statistics_candidates_from_sensor(
+        candidates = STATISTICS.statistics_candidates_from_sensor(
             runtime=runtime,
             metric_key="heart_rate",
             metric_name="Heart rate",
@@ -662,7 +752,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             display_name="Tester One",
         )
 
-        candidates = BRIDGE._statistics_candidates_from_sensor(
+        candidates = STATISTICS.statistics_candidates_from_sensor(
             runtime=runtime,
             metric_key="heart_rate",
             metric_name="Heart rate",
@@ -675,8 +765,8 @@ class StatisticsHelpersTests(unittest.TestCase):
         self.assertEqual(candidates[0]["statistic_id"], "halthy:tester_1_heart_rate")
 
     def test_statistics_metadata_includes_unit_class(self) -> None:
-        statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
-        metadata = BRIDGE._statistics_metadata(statistic_id, "Heart rate", "bpm")
+        statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
+        metadata = STATISTICS.statistics_metadata(statistic_id, "Heart rate", "bpm")
         self.assertIsNotNone(metadata)
         self.assertTrue(hasattr(metadata, "unit_class"))
         self.assertIsNone(getattr(metadata, "unit_class"))
@@ -687,7 +777,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             app_username="tester",
             display_name="Tester",
         )
-        statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
+        statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
         previous_cursor = "2026-03-01T10:00:00+00:00"
         runtime.statistics_cursors[statistic_id] = previous_cursor
 
@@ -700,7 +790,7 @@ class StatisticsHelpersTests(unittest.TestCase):
                 "value": 61.0,
             }
         ]
-        batches, cursor_updates = BRIDGE._prepare_statistics_imports_for_runtime(runtime, candidates)
+        batches, cursor_updates = STATISTICS.prepare_statistics_imports_for_runtime(runtime, candidates)
 
         self.assertEqual(runtime.statistics_cursors.get(statistic_id), previous_cursor)
         self.assertEqual(len(batches), 1)
@@ -716,8 +806,8 @@ class StatisticsHelpersTests(unittest.TestCase):
             app_username="tester",
             display_name="Tester",
         )
-        successful_statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
-        failed_statistic_id = BRIDGE._statistics_id_for_metric("tester", "oxygen_saturation")
+        successful_statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
+        failed_statistic_id = STATISTICS.statistics_id_for_metric("tester", "oxygen_saturation")
         legacy_id = "tester_heart_rate"
         runtime.statistics_cursors[legacy_id] = "2026-03-01T09:30:00+00:00"
         runtime.statistics_cursors[failed_statistic_id] = "2026-03-01T09:00:00+00:00"
@@ -732,7 +822,7 @@ class StatisticsHelpersTests(unittest.TestCase):
                 legacy_statistic_ids=(),
             ),
         }
-        BRIDGE._commit_statistics_cursor_updates(
+        STATISTICS.commit_statistics_cursor_updates(
             runtime=runtime,
             cursor_updates=cursor_updates,
             successful_statistic_ids={successful_statistic_id},
@@ -754,7 +844,7 @@ class StatisticsHelpersTests(unittest.TestCase):
             app_username="tester",
             display_name="Tester",
         )
-        statistic_id = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
+        statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
         runtime.statistics_cursors[statistic_id] = "2026-03-01T12:00:00+00:00"
 
         cursor_updates = {
@@ -763,7 +853,7 @@ class StatisticsHelpersTests(unittest.TestCase):
                 legacy_statistic_ids=(),
             )
         }
-        BRIDGE._commit_statistics_cursor_updates(
+        STATISTICS.commit_statistics_cursor_updates(
             runtime=runtime,
             cursor_updates=cursor_updates,
             successful_statistic_ids={statistic_id},
@@ -775,16 +865,16 @@ class StatisticsHelpersTests(unittest.TestCase):
         )
 
     def test_statistics_batch_import_reports_successful_series(self) -> None:
-        statistic_id_ok = BRIDGE._statistics_id_for_metric("tester", "heart_rate")
-        statistic_id_fail = BRIDGE._statistics_id_for_metric("tester", "oxygen_saturation")
+        statistic_id_ok = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
+        statistic_id_fail = STATISTICS.statistics_id_for_metric("tester", "oxygen_saturation")
 
-        metadata_ok = BRIDGE._statistics_metadata(statistic_id_ok, "Heart rate", "bpm")
-        metadata_fail = BRIDGE._statistics_metadata(statistic_id_fail, "Blood oxygen", "%")
-        row_ok = BRIDGE._statistics_data(
+        metadata_ok = STATISTICS.statistics_metadata(statistic_id_ok, "Heart rate", "bpm")
+        metadata_fail = STATISTICS.statistics_metadata(statistic_id_fail, "Blood oxygen", "%")
+        row_ok = STATISTICS.statistics_data(
             start=datetime(2026, 3, 1, 10, 0, tzinfo=timezone.utc),
             state=61.0,
         )
-        row_fail = BRIDGE._statistics_data(
+        row_fail = STATISTICS.statistics_data(
             start=datetime(2026, 3, 1, 10, 5, tzinfo=timezone.utc),
             state=97.0,
         )

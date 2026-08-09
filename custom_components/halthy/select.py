@@ -17,7 +17,7 @@ from . import (
 )
 from .const import DOMAIN, MANUFACTURER
 from .naming import sanitize_identifier
-from .runtime import IntegrationRuntime
+from .runtime import IntegrationRuntime, runtime_device_identifiers
 
 
 async def async_setup_entry(
@@ -40,9 +40,7 @@ class HalthyForceUploadIntervalSelect(SelectEntity):
     def __init__(self, runtime: IntegrationRuntime, entry_id: str) -> None:
         self._runtime = runtime
         self._entry_id = entry_id
-        self._attr_unique_id = (
-            f"{DOMAIN}_{sanitize_identifier(runtime.configured_username)}_force_upload_interval"
-        )
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_force_upload_interval"
         self._attr_name = "Upload interval"
         self._attr_icon = "mdi:timer-cog-outline"
         self._attr_entity_category = EntityCategory.CONFIG
@@ -54,9 +52,8 @@ class HalthyForceUploadIntervalSelect(SelectEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        device_key = f"user:{self._runtime.configured_username}"
         return DeviceInfo(
-            identifiers={(DOMAIN, device_key)},
+            identifiers=runtime_device_identifiers(self._runtime),
             manufacturer=MANUFACTURER,
             model="iOS App",
             name=self._runtime.display_name,
