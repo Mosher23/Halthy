@@ -153,6 +153,8 @@ WORKOUT_METADATA_ATTRIBUTE_KEYS: tuple[str, ...] = (
     "weather_condition_raw",
     "weather_temperature_c",
     "weather_humidity_percent",
+    "weather_attribution_service",
+    "weather_attribution_url",
     "workout_zone_groups",
     "heart_rate_zones",
     "heart_rate_zone_total_duration_s",

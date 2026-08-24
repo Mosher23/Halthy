@@ -24,7 +24,7 @@ Depending on permissions and enabled features, Halthy can access:
 - Workout-route locations, including latitude, longitude, altitude, timestamps, speed, and course when HealthKit provides them.
 - Home Assistant sensor values selected in an import mapping.
 - Camera frames while the user is actively scanning a QR code used to fill destination configuration.
-- App Store transaction information made available by StoreKit to verify the seven-day trial and lifetime-access purchase on the device.
+- App Store transaction information made available by StoreKit to verify the lifetime-access purchase on the device.
 
 The camera image is processed for QR recognition and is not uploaded to the Halthy developer.
 
@@ -39,7 +39,7 @@ Halthy uses data only to provide features selected by the user:
 - Reading selected Home Assistant sensor values and writing mapped values to Apple Health after write permission is granted.
 - Generating workout route images and uploading them to Home Assistant when enabled.
 - Creating local notifications for enabled events, such as repeated synchronization failures or workout uploads.
-- Determining trial or lifetime-access status through StoreKit and local entitlement state.
+- Determining the local trial period and StoreKit-verified lifetime-access status.
 
 ## Developer Data Collection
 
