@@ -12,12 +12,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Safe migration for renamed usernames and archived workout images.
 - Bounded workout-calendar metadata retention.
 - Public release, security, and contribution documentation.
+- Documentation for the iOS app's seven-day local trial and one-time lifetime-access purchase.
+- Documentation for local PDF, CSV, and GPX health-data exports.
+- Documentation for workout replay, shareable replay videos, Apple Weather enrichment, health insights, and configurable notifications.
 
 ### Changed
 
 - HACS releases use the published `halthy.zip` artifact.
 - GitHub Actions use pinned revisions and explicit permissions.
 - Configuration selector options support Home Assistant translations.
+- Privacy documentation now covers WeatherKit requests, workout weather caching, replay videos, trend notifications, and the current entitlement model.
 
 ## [0.1.0] - 2026-08-09
 

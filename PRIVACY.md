@@ -1,6 +1,6 @@
 # Halthy Privacy Policy
 
-Last updated: August 4, 2026
+Last updated: August 26, 2026
 
 Halthy is an iPhone app that reads selected Apple Health data, displays health and workout information on the device, and can send selected data to services that the user configures, such as Home Assistant and InfluxDB.
 
@@ -22,6 +22,7 @@ Depending on permissions and enabled features, Halthy can access:
 - Selected HealthKit metrics, including activity, energy, distance, heart rate, blood oxygen, sleep, and related values.
 - Workout details, including type, start and end times, duration, distance, active energy, speed, elevation, cadence, heart-rate samples, and available zone information.
 - Workout-route locations, including latitude, longitude, altitude, timestamps, speed, and course when HealthKit provides them.
+- A representative workout-route location and workout time used to request historical conditions from Apple Weather when weather enrichment is available.
 - Home Assistant sensor values selected in an import mapping.
 - Camera frames while the user is actively scanning a QR code used to fill destination configuration.
 - App Store transaction information made available by StoreKit to verify the lifetime-access purchase on the device.
@@ -33,12 +34,15 @@ The camera image is processed for QR recognition and is not uploaded to the Halt
 Halthy uses data only to provide features selected by the user:
 
 - Displaying local health statistics, charts, summaries, workouts, maps, and route replays.
+- Enriching workout displays and generated route images with available workout-time conditions from Apple Weather.
+- Creating a workout replay video for the user to review or share.
 - Generating PDF, CSV, and optional GPX exports for the user to share through the iOS share sheet.
 - Sending selected data to the user's Home Assistant instance.
 - Sending selected raw data to the user's InfluxDB instance when enabled.
 - Reading selected Home Assistant sensor values and writing mapped values to Apple Health after write permission is granted.
 - Generating workout route images and uploading them to Home Assistant when enabled.
 - Creating local notifications for enabled events, such as repeated synchronization failures or workout uploads.
+- Creating optional local trend notifications based on changes from a recent on-device baseline.
 - Determining the local trial period and StoreKit-verified lifetime-access status.
 
 ## Developer Data Collection
@@ -67,9 +71,11 @@ When the user enables an import mapping and grants write permission, Halthy can 
 
 Halthy can create local PDF, CSV, and GPX files containing selected health, workout, and precise route-location data. These files are shared only after the user starts an export and selects a destination in the iOS share sheet. The selected destination's privacy practices apply after the file is shared.
 
+Halthy can also create a local workout replay video. The video is shared only after the user chooses a destination in the iOS share sheet.
+
 ## Apple Services
 
-Halthy uses Apple system services including HealthKit, MapKit, StoreKit, BackgroundTasks, notifications, and the iOS share sheet. On supported devices, Halthy can use Apple's Foundation Models framework to create summaries on the device. Halthy does not send the summary context to a Halthy-operated model or cloud service.
+Halthy uses Apple system services including HealthKit, MapKit, WeatherKit, StoreKit, BackgroundTasks, notifications, and the iOS share sheet. When weather enrichment is available, WeatherKit receives a representative workout-route location and workout time to return historical conditions. On supported devices, Halthy can use Apple's Foundation Models framework to create summaries on the device. Halthy does not send the summary context to a Halthy-operated model or cloud service.
 
 Apple may process information under Apple's own terms and privacy policy when its services are used. The Halthy developer does not receive that information through a Halthy backend.
 
@@ -79,7 +85,7 @@ Halthy stores app configuration and operational data in the app's local containe
 
 - Destination URLs, usernames, selected metrics, import mappings, and preferences.
 - HealthKit synchronization cursors, upload status, and pending upload queues.
-- Cached health summaries, workouts, route data, generated route images, and export files while needed for app functionality or sharing.
+- Cached health summaries, workouts, route data, workout weather, generated route images, replay videos, and export files while needed for app functionality or sharing.
 - Local notification and troubleshooting information.
 
 Home Assistant and InfluxDB access tokens and the local trial-start record are stored in the iOS Keychain using device-only protection. Network transfers to configured destinations require HTTPS.

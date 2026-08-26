@@ -28,6 +28,10 @@ Halthy does not operate a central backend. Health, workout, and route data are s
 - Optional Home Assistant activity logbook integration (configurable)
 - Optional import from Home Assistant sensors back into HealthKit (in app)
 - Optional raw export to InfluxDB for long-range history and Grafana dashboards
+- Local PDF, CSV, and GPX health-data exports through the iOS share sheet
+- Workout maps with Apple Weather context, route replay, and shareable replay videos
+- On-device health summaries, charts, trends, and configurable notifications
+- Seven-day local trial with an optional one-time lifetime-access purchase
 - Home Assistant UI setup with multi-user ownership handling
 - Built-in `custom:halthy-workout-card` Lovelace card with workout map navigation and calendar archive
 
@@ -221,16 +225,70 @@ Open **Halthy -> Settings**.
 
 ### 👍 Recommended
 
-- Enable background upload
+- Enable **Background Upload** for best-effort automatic synchronization
 - Select health data types
 - Grant workout and route permissions if needed
 - Use Test connection
 
-### 🧠 Optional App Features
+> [!NOTE]
+> iOS controls when background tasks may run. Background Upload improves automation, but it does not guarantee an exact execution time. Open Halthy or use **Upload Now** when an immediate upload is required.
+
+### 🔐 Trial and Lifetime Access
+
+- Halthy offers a seven-day trial that starts locally on the device.
+- After the trial, premium features can be unlocked with a one-time lifetime-access purchase through Apple StoreKit. It is not a subscription.
+- Purchases can be restored from the app.
+- Connection setup and foreground upload tools remain available without premium access; premium access enables features such as background synchronization, workout replay, and sharing.
+
+### 🧠 Dashboard and Health Insights
+
+The app can display selected HealthKit information locally as readable dashboard cards, charts, trends, summaries, and workout history.
+
+- Dashboard content is based on the HealthKit permissions and metrics selected by the user.
+- Trend notifications compare recent local data with a recent baseline and can be disabled independently.
+- On supported devices, summaries can use Apple's on-device Foundation Models framework. Summary context is not sent to a Halthy-operated service.
+- Halthy is not a medical device, and summaries or trends are not medical advice, diagnosis, or treatment.
+
+### 🗺️ Workout Maps, Weather, Replay, and Sharing
+
+For workouts with route permission and route data, Halthy can:
+
+- Display detailed, satellite, and 3D workout maps.
+- Enrich route displays with workout-time conditions from Apple Weather, including available temperature, humidity, wind, and condition data.
+- Replay a workout route and create a shareable replay video.
+- Generate route-map images for Home Assistant using configurable map styles and aspect ratio.
+- Queue previously archived maps for re-upload after Home Assistant map-preset changes.
+
+Apple Weather enrichment requires a route location and network availability. Existing HealthKit weather metadata remains the fallback when enrichment is unavailable.
+
+### 📤 Local Health Data Export
+
+Open **Halthy -> Settings -> Health Data Export** to create files from selected HealthKit data:
+
+- **PDF** reports, with optional graphs
+- **CSV** data files
+- **GPX** files for workout routes
+- Preset or custom date ranges
+- Optional workout and route inclusion
+
+Files are generated locally and are shared only after the user selects a destination in the iOS share sheet. GPX export requires workouts and routes to be included.
+
+### 🔔 Notifications
+
+Notifications are optional and configurable in **Halthy -> Settings -> Notifications**:
+
+- **Sync failures**: alerts after repeated upload failures
+- **Workout uploads**: alerts when new workouts are ready and when maps and metrics are uploaded
+- **Trend changes**: alerts when local trends move meaningfully from their recent baseline
+
+Notification permission remains controlled by iOS. Disabling notifications does not disable uploads.
+
+### ⚙️ Other Optional App Features
 
 - **Import metrics**: pull mapped Home Assistant sensor states into HealthKit
 - **InfluxDB**: export raw HealthKit samples to InfluxDB
 - **Shortcuts action**: trigger **Upload Now** from the iOS Shortcuts app
+- **Appearance and language**: follow the system or choose a light/dark appearance and a supported app language
 - **Log** section: view upload/import status and troubleshooting hints
 
 ## 🔗 iOS Shortcuts: Upload Now
