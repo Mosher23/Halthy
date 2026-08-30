@@ -5,7 +5,7 @@ Halthy is a Home Assistant custom integration that receives health metrics from 
 > [!NOTE]
 > **Halthy for iPhone is available in beta.**
 >
-> Join the TestFlight beta to test the app on an iPhone running iOS 18.5 or later. Beta builds may contain bugs and expire after 90 days. Please send feedback through TestFlight or [GitHub Issues](https://github.com/Mosher23/Halthy/issues).
+> [Join the TestFlight](https://testflight.apple.com/join/8KWJZZj2) to test the app on an iPhone running iOS 18.5 or later. Beta builds may contain bugs and expire after 90 days. Please send feedback through TestFlight or [GitHub Issues](https://github.com/Mosher23/Halthy/issues).
 
 Project documentation, privacy information, and security reporting instructions are available in the repository root: [`../../README.md`](../../README.md), [`../../PRIVACY.md`](../../PRIVACY.md), and [`../../SECURITY.md`](../../SECURITY.md). For support, use the [GitHub issue tracker](https://github.com/Mosher23/Halthy/issues).
 
