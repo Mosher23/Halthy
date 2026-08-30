@@ -15,6 +15,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Documentation for the iOS app's seven-day local trial and one-time lifetime-access purchase.
 - Documentation for local PDF, CSV, and GPX health-data exports.
 - Documentation for workout replay, shareable replay videos, Apple Weather enrichment, health insights, and configurable notifications.
+- Documentation for workout-card image sharing and optional Save to Photos behavior.
 
 ### Changed
 
@@ -22,6 +23,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - GitHub Actions use pinned revisions and explicit permissions.
 - Configuration selector options support Home Assistant translations.
 - Privacy documentation now covers WeatherKit requests, workout weather caching, replay videos, trend notifications, and the current entitlement model.
+- Privacy documentation now covers add-only Photos access.
 
 ## [0.1.0] - 2026-08-09
 

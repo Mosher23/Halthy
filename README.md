@@ -256,6 +256,7 @@ For workouts with route permission and route data, Halthy can:
 - Display detailed, satellite, and 3D workout maps.
 - Enrich route displays with workout-time conditions from Apple Weather, including available temperature, humidity, wind, and condition data.
 - Replay a workout route and create a shareable replay video.
+- Create a workout-card image for sharing or optional saving to Photos.
 - Generate route-map images for Home Assistant using configurable map styles and aspect ratio.
 - Queue previously archived maps for re-upload after Home Assistant map-preset changes.
 

@@ -1,6 +1,6 @@
 # Halthy Privacy Policy
 
-Last updated: August 26, 2026
+Last updated: August 30, 2026
 
 Halthy is an iPhone app that reads selected Apple Health data, displays health and workout information on the device, and can send selected data to services that the user configures, such as Home Assistant and InfluxDB.
 
@@ -25,6 +25,7 @@ Depending on permissions and enabled features, Halthy can access:
 - A representative workout-route location and workout time used to request historical conditions from Apple Weather when weather enrichment is available.
 - Home Assistant sensor values selected in an import mapping.
 - Camera frames while the user is actively scanning a QR code used to fill destination configuration.
+- Add-only access to the Photos library when the user chooses **Save to Photos** for a workout-card image. Halthy does not read the user's photo library.
 - App Store transaction information made available by StoreKit to verify the lifetime-access purchase on the device.
 
 The camera image is processed for QR recognition and is not uploaded to the Halthy developer.
@@ -36,6 +37,7 @@ Halthy uses data only to provide features selected by the user:
 - Displaying local health statistics, charts, summaries, workouts, maps, and route replays.
 - Enriching workout displays and generated route images with available workout-time conditions from Apple Weather.
 - Creating a workout replay video for the user to review or share.
+- Creating a workout-card image for sharing or optional saving to Photos.
 - Generating PDF, CSV, and optional GPX exports for the user to share through the iOS share sheet.
 - Sending selected data to the user's Home Assistant instance.
 - Sending selected raw data to the user's InfluxDB instance when enabled.
@@ -73,9 +75,11 @@ Halthy can create local PDF, CSV, and GPX files containing selected health, work
 
 Halthy can also create a local workout replay video. The video is shared only after the user chooses a destination in the iOS share sheet.
 
+Halthy can create a workout-card image containing workout details and a route map. The image is shared only after the user chooses a destination in the iOS share sheet, or saved to the Photos library only after the user selects **Save to Photos** and grants add-only Photos access.
+
 ## Apple Services
 
-Halthy uses Apple system services including HealthKit, MapKit, WeatherKit, StoreKit, BackgroundTasks, notifications, and the iOS share sheet. When weather enrichment is available, WeatherKit receives a representative workout-route location and workout time to return historical conditions. On supported devices, Halthy can use Apple's Foundation Models framework to create summaries on the device. Halthy does not send the summary context to a Halthy-operated model or cloud service.
+Halthy uses Apple system services including HealthKit, MapKit, WeatherKit, StoreKit, BackgroundTasks, Photos, notifications, and the iOS share sheet. When weather enrichment is available, WeatherKit receives a representative workout-route location and workout time to return historical conditions. On supported devices, Halthy can use Apple's Foundation Models framework to create summaries on the device. Halthy does not send the summary context to a Halthy-operated model or cloud service.
 
 Apple may process information under Apple's own terms and privacy policy when its services are used. The Halthy developer does not receive that information through a Halthy backend.
 
@@ -111,7 +115,7 @@ Because Halthy has no developer backend or app accounts, the developer has no se
 
 HealthKit read and write permissions are controlled by the user. Halthy requests access only for enabled functionality. The user can grant, deny, or later revoke individual data-type permissions through Apple Health and iOS privacy settings.
 
-Camera and notification permissions are optional. Denying them disables only the related QR-scanning or notification feature.
+Camera, Photos, and notification permissions are optional. Denying them disables only the related QR-scanning, Save to Photos, or notification feature. Halthy requests add-only Photos access and does not request permission to read the photo library.
 
 ## Children
 
