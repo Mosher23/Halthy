@@ -9,7 +9,7 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 > [!NOTE]
 > **Halthy for iPhone is available in beta.**
 >
-> Join the TestFlight beta to test the app on an iPhone running iOS 18.5 or later. Beta builds may contain bugs and expire after 90 days. Please send feedback through TestFlight or [GitHub Issues](https://github.com/Mosher23/Halthy/issues).
+> [Join the TestFlight](https://testflight.apple.com/join/8KWJZZj2) beta to test the app on an iPhone running iOS 18.5 or later. Beta builds may contain bugs and expire after 90 days. Please send feedback through TestFlight or [GitHub Issues](https://github.com/Mosher23/Halthy/issues).
 
 ## Documentation, Privacy, and Support
 
