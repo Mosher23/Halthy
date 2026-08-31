@@ -144,6 +144,7 @@ class HalthyWorkoutCard extends HTMLElement {
       calendar_icon: "mdi:calendar-month",
       calendar_button_label: "Open Workout Calendar",
       calendar_empty_day_message: "Select a highlighted day to view its workout image.",
+      show_heart_rate_zones: true,
       ...config,
     };
     this._lastStateSignature = "";
@@ -1384,7 +1385,9 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     const sections = [
-      this._renderZoneSection("Heart-rate zones", details.heartZones, "hr"),
+      this._config.show_heart_rate_zones !== false
+        ? this._renderZoneSection("Heart-rate zones", details.heartZones, "hr")
+        : "",
       this._renderZoneSection("Power zones", details.powerZones, "power"),
     ].filter(Boolean);
 
@@ -3071,6 +3074,7 @@ class HalthyWorkoutCardEditor extends HTMLElement {
       typeof this._config.calendar_icon === "string" && this._config.calendar_icon.trim()
         ? this._config.calendar_icon.trim()
         : "mdi:calendar-month";
+    const showHeartRateZones = this._config.show_heart_rate_zones !== false;
     const hasIconPicker = typeof customElements !== "undefined" && !!customElements.get("ha-icon-picker");
     const calendarIconField = hasIconPicker
       ? `
@@ -3144,12 +3148,19 @@ class HalthyWorkoutCardEditor extends HTMLElement {
           <label for="calendar_icon">Calendar icon</label>
           ${calendarIconField}
         </div>
+
+        <div class="field">
+          <label for="show_heart_rate_zones">Show heart rate zones</label>
+          <ha-selector id="show_heart_rate_zones"></ha-selector>
+          <div class="hint">Show the heart-rate zone chart in workout details.</div>
+        </div>
       </div>
     `;
 
     const userSelector = this.shadowRoot.getElementById("user_selector");
     const titleSelector = this.shadowRoot.getElementById("title_selector");
     const calendarIconInput = this.shadowRoot.getElementById("calendar_icon");
+    const showHeartRateZonesSelector = this.shadowRoot.getElementById("show_heart_rate_zones");
 
     if (userSelector) {
       userSelector.hass = this._hass;
@@ -3210,6 +3221,24 @@ class HalthyWorkoutCardEditor extends HTMLElement {
 
       calendarIconInput.addEventListener("value-changed", onCalendarIconChanged);
       calendarIconInput.addEventListener("change", onCalendarIconChanged);
+    }
+
+    if (showHeartRateZonesSelector) {
+      showHeartRateZonesSelector.hass = this._hass;
+      showHeartRateZonesSelector.selector = { boolean: {} };
+      if ("value" in showHeartRateZonesSelector) {
+        showHeartRateZonesSelector.value = showHeartRateZones;
+      }
+
+      const onShowHeartRateZonesChanged = (event) => {
+        const value = event?.detail?.value ?? event?.target?.value;
+        this._emitConfig({
+          show_heart_rate_zones: value === true || value === "true" || value === 1 || value === "1",
+        });
+      };
+
+      showHeartRateZonesSelector.addEventListener("value-changed", onShowHeartRateZonesChanged);
+      showHeartRateZonesSelector.addEventListener("change", onShowHeartRateZonesChanged);
     }
 
   }

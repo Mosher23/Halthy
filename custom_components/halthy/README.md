@@ -59,9 +59,10 @@ Minimal config:
 ```yaml
 type: custom:halthy-workout-card
 user: your_username
+show_heart_rate_zones: true
 ```
 
-The visual card editor detects configured Halthy users and proposes them for selection.
+The visual card editor detects configured Halthy users and proposes them for selection. Heart-rate zones are shown by default; turn off **Show heart rate zones** in the visual editor or set `show_heart_rate_zones: false` in YAML to hide them.
 
 ## Workout Calendar
 
