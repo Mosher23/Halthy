@@ -96,6 +96,10 @@ For full raw sample history and advanced analytics, use optional InfluxDB export
    - **Display Name** (optional)
 8. Repeat per person.
 
+#### Fix an installation from `v0.1.0-beta`
+
+The `v0.1.0-beta` release archive could install Halthy under an incorrect nested directory. If your installation contains `custom_components/halthy/custom_components/halthy`, remove Halthy in HACS, delete the remaining `custom_components/halthy` directory, install `v0.1.1-beta` or newer, and restart Home Assistant. Removing the HACS files does not remove the person configurations stored by Home Assistant.
+
 ### 🧰 Manual Install
 
 1. Copy `custom_components/halthy` to `<config>/custom_components/`.

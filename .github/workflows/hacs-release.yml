@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   package:
-    name: Package integration from Integration folder
+    name: Package Halthy integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,16 +21,7 @@ jobs:
       - name: Build HACS release zip
         id: build_package
         run: |
-          set -euo pipefail
-          rm -rf dist halthy.zip
-          mkdir -p dist/custom_components
-          cp -R custom_components/halthy dist/custom_components/halthy
-          cp dist/custom_components/halthy/README.md dist/README.md || true
-          cp LICENSE dist/LICENSE
-          (
-            cd dist
-            zip -r ../halthy.zip .
-          )
+          .github/scripts/build_hacs_package.sh halthy.zip
           echo "package_name=halthy.zip" >> "$GITHUB_OUTPUT"
 
       - name: Attach package to release

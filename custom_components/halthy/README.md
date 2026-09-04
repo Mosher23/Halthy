@@ -29,6 +29,10 @@ Project documentation, privacy information, and security reporting instructions 
 3. Install **Halthy**.
 4. Restart Home Assistant.
 
+### Fix an installation from `v0.1.0-beta`
+
+The `v0.1.0-beta` release archive could install Halthy under an incorrect nested directory. If your installation contains `custom_components/halthy/custom_components/halthy`, remove Halthy in HACS, delete the remaining `custom_components/halthy` directory, install `v0.1.1-beta` or newer, and restart Home Assistant. Removing the HACS files does not remove the person configurations stored by Home Assistant.
+
 ### Manual
 
 1. Copy `custom_components/halthy` into `<config>/custom_components/`.

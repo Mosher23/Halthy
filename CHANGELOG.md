@@ -16,6 +16,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Documentation for local PDF, CSV, and GPX health-data exports.
 - Documentation for workout replay, shareable replay videos, Apple Weather enrichment, health insights, and configurable notifications.
 - Documentation for workout-card image sharing and optional Save to Photos behavior.
+- Workout-card option to show or hide heart-rate zones.
 
 ### Changed
 
@@ -24,6 +25,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configuration selector options support Home Assistant translations.
 - Privacy documentation now covers WeatherKit requests, workout weather caching, replay videos, trend notifications, and the current entitlement model.
 - Privacy documentation now covers add-only Photos access.
+
+### Fixed
+
+- HACS release packages now contain integration files at the archive root, preventing installation under `custom_components/halthy/custom_components/halthy`.
+- Release-package validation rejects nested integration paths and development-only files before publishing.
 
 ## [0.1.0] - 2026-08-09
 

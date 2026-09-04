@@ -27,3 +27,6 @@ jobs:
 
       - name: Validate workout card JavaScript
         run: node --check custom_components/halthy/halthy-workout-card.js
+
+      - name: Validate HACS release package layout
+        run: .github/scripts/build_hacs_package.sh /tmp/halthy.zip
