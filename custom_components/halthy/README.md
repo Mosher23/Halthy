@@ -47,6 +47,10 @@ The `v0.1.0-beta` release archive could install Halthy under an incorrect nested
    - **Display Name** (optional): shown as device name in Home Assistant
 4. Repeat for each person.
 
+### Height and Weight sensor settings
+
+Height is reported in centimetres by default. Body mass is displayed as **Weight**. Both sensors suggest one decimal place and support Home Assistant's unit conversion and display precision settings: open the sensor, select the settings cog, and adjust **Unit of measurement** and **Display precision**. Your choices are kept across uploads. Existing entity IDs stay the same, including `sensor.<username>_body_mass`.
+
 ## Built-in Workout Card
 
 Halthy includes a bundled Lovelace card: `custom:halthy-workout-card`.

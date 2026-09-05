@@ -90,6 +90,7 @@ _FRIENDLY_TOKEN_EXPANSIONS = {
 }
 
 _FRIENDLY_KEY_OVERRIDES = {
+    "body_mass": "weight",
     "last_full_sync": "last full sync",
     "last_update": "last update",
     "oxygen_saturation": "blood oxygen",

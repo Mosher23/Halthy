@@ -1,0 +1,3 @@
+homeassistant==2025.6.3
+# This Home Assistant release's aiodns dependency requires pycares 4.x.
+pycares<5

@@ -7,6 +7,20 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2-beta] - 2026-09-05
+
+### Changed
+
+- Height sensors report centimetres by default and support Home Assistant unit selection and display precision.
+- Body mass is displayed as Weight, with unit selection and display precision; existing entity IDs are preserved.
+- Both sensors suggest one decimal place and preserve user-selected units and precision across uploads.
+
+### Added
+
+- Sensor regression tests using Home Assistant's unit conversion and saved entity options, included in CI.
+
+## [0.1.1-beta] - 2026-09-04
+
 ### Added
 
 - Safe migration for renamed usernames and archived workout images.
@@ -41,5 +55,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and per-user workout calendars.
 - Optional activity logging and app command controls.
 
-[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.2-beta...HEAD
+[0.1.2-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.2-beta
+[0.1.1-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.1-beta
 [0.1.0]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.0
