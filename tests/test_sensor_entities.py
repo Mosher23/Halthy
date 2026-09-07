@@ -23,6 +23,25 @@ runtime_module = import_module(f"{package.__name__}.runtime")
 
 
 class SensorEntityTests(unittest.TestCase):
+    def test_sleep_timestamps_and_missing_bedtime(self):
+        from datetime import datetime
+
+        for key in ("go_to_bed_time", "fall_asleep_time", "wake_up_time"):
+            sensor, original = self.make_sensor(key, "2026-09-07T07:30:00+02:00", None)
+            self.assertEqual(sensor.device_class, SensorDeviceClass.TIMESTAMP)
+            self.assertEqual(sensor.native_value, datetime.fromisoformat(original.state))
+            self.assertIsNone(sensor.state_class)
+            self.assertIsNone(sensor.native_unit_of_measurement)
+            self.assertEqual(sensor._attr_suggested_object_id, f"tester_{key}")
+            naming = import_module(f"{package.__name__}.naming")
+            self.assertEqual(naming.friendly_metric_name(key, None), key.replace("_", " ").capitalize())
+            self.assertTrue(naming.metric_icon(key, None).startswith("mdi:"))
+            sensor._apply_state(replace(original, state="unknown"))
+            self.assertIsNone(sensor.native_value)
+            self.assertEqual(sensor.device_class, SensorDeviceClass.TIMESTAMP)
+            sensor._apply_state(original)
+            self.assertEqual(sensor.native_value, datetime.fromisoformat(original.state))
+
     def make_sensor(self, key, value, unit):
         state = runtime_module.HalthySensorState(
             unique_id=f"tester_{key}", metric_key=key, name="Body mass" if key == "body_mass" else key,

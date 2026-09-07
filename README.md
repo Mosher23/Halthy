@@ -107,6 +107,18 @@ The `v0.1.0-beta` release archive could install Halthy under an incorrect nested
 3. Add integration from UI.
 
 
+### Sleep times
+
+With an updated Halthy iOS app, selecting a sleep metric for upload also creates three sensors for each user:
+
+- **Go to bed time** (`sensor.<username>_go_to_bed_time`): the start of recorded in-bed time associated with falling asleep. It is **unknown** if no matching in-bed record exists, rather than estimated from sleep duration.
+- **Fall asleep time** (`sensor.<username>_fall_asleep_time`): the first recorded asleep stage in the selected sleep session.
+- **Wake up time** (`sensor.<username>_wake_up_time`): the end of the final recorded asleep stage in that session, not the time you left bed.
+
+All three refer to the same latest main sleep session within the app's 48-hour lookback. Sleep stages and gaps of up to 90 minutes are grouped together; overlapping samples are merged. Sessions of at least two hours are preferred over short naps, with a 20-minute minimum fallback when no main session is found. These are recorded sleep boundaries, not live detection of whether you are currently asleep.
+
+The sensors contain full timezone-aware timestamps and use Home Assistant's timestamp display. They update on the next app upload, even if total sleep duration is unchanged. A newer session without in-bed data clears the previous bedtime to unknown. If the app cannot read a session, existing values remain unchanged. Update both the app and integration; earlier app versions send durations without these boundaries. No additional permission beyond access to sleep data is needed.
+
 ### Height and Weight sensor settings
 
 Height is reported in centimetres by default. Body mass is displayed as **Weight**. Both sensors suggest one decimal place and support Home Assistant's unit conversion and display precision settings: open the sensor, select the settings cog, and adjust **Unit of measurement** and **Display precision**. Your choices are kept across uploads. Existing entity IDs stay the same, including `sensor.<username>_body_mass`.

@@ -7,6 +7,19 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Per-user **Go to bed time** (`go_to_bed_time`): start of the recorded in-bed interval associated with the selected sleep session.
+- Per-user **Fall asleep time** (`fall_asleep_time`): first recorded asleep stage in that session.
+- Per-user **Wake up time** (`wake_up_time`): end of the final recorded asleep stage in the same session.
+- Missing recorded in-bed time is shown as unknown rather than estimated. Sleep timestamp sensors retain their timestamp device class when the value is unknown.
+- Tests covering timestamp entities, overnight sleep stages, duplicate samples, brief awakenings, main-session selection, and missing in-bed records.
+
+### Compatibility
+
+- These sensors require both the updated integration and an updated iOS app that sends sleep-session timestamps. Earlier app versions send sleep durations without the required boundaries.
+- Selecting a sleep metric in the updated app also enables the three timestamp sensors. They refresh on app uploads even if total sleep duration is unchanged.
+
 ## [0.1.2-beta] - 2026-09-05
 
 ### Changed
