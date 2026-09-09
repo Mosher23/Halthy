@@ -27,7 +27,7 @@ rm -f "${output_path}"
 
 archive_contents="$(unzip -Z1 "${output_path}")"
 
-for required_file in __init__.py manifest.json strings.json; do
+for required_file in __init__.py manifest.json strings.json brand/icon.png brand/icon@2x.png; do
   if ! grep -qx "${required_file}" <<<"${archive_contents}"; then
     echo "Required file is missing from the archive root: ${required_file}" >&2
     exit 1

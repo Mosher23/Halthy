@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3-beta] - 2026-09-09
+
+### Fixed
+
+- Last update, Last full sync, and the daily-upload diagnostic timestamp now use Home Assistant's upload-processing time rather than the newest measurement timestamp.
+- Historical and duplicate samples can reach statistics import without replacing the latest live sensor state. Newer cursor values no longer suppress earlier backfills or retries.
+- Recorder metadata includes units even for unitless statistics and uses the modern mean type when available.
+- Release packaging now verifies both bundled brand icons. Added troubleshooting for HACS's separate public icon lookup and timestamp display formatting.
+
 ### Added
 
 - Per-user **Go to bed time** (`go_to_bed_time`): start of the recorded in-bed interval associated with the selected sleep session.
@@ -68,7 +77,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and per-user workout calendars.
 - Optional activity logging and app command controls.
 
-[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.2-beta...HEAD
+[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.3-beta...HEAD
+[0.1.3-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.3-beta
 [0.1.2-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.2-beta
 [0.1.1-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.1-beta
 [0.1.0]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.0

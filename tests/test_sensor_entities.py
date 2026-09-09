@@ -23,6 +23,32 @@ runtime_module = import_module(f"{package.__name__}.runtime")
 
 
 class SensorEntityTests(unittest.TestCase):
+    def test_statistics_metadata_is_accepted_by_recorder(self):
+        from datetime import datetime, timezone
+        from unittest.mock import Mock, patch
+        from homeassistant.components.recorder import statistics as recorder
+
+        statistics = import_module(f"{package.__name__}.statistics")
+        for unit in ("bpm", None):
+            metadata = statistics.statistics_metadata("halthy:tester_heart_rate", "Heart rate (tester)", unit)
+            self.assertIn("unit_of_measurement", metadata)
+            self.assertIn("mean_type", metadata)
+            self.assertNotIn("has_mean", metadata)
+            rows = [statistics.statistics_data(datetime(2026, 9, 8, 10, tzinfo=timezone.utc), 65)]
+            instance = Mock()
+            with patch.object(recorder, "get_instance", return_value=instance):
+                recorder.async_add_external_statistics(Mock(), metadata, rows)
+            instance.async_import_statistics.assert_called_once()
+
+    def test_sleep_utc_timestamp_displays_in_berlin_without_changing_instant(self):
+        from zoneinfo import ZoneInfo
+
+        for key in ("fall_asleep_time", "wake_up_time", "go_to_bed_time"):
+            sensor, _ = self.make_sensor(key, "2026-09-08T21:24:40Z", None)
+            local = sensor.native_value.astimezone(ZoneInfo("Europe/Berlin"))
+            self.assertEqual(local.isoformat(), "2026-09-08T23:24:40+02:00")
+            self.assertEqual(sensor.device_class, SensorDeviceClass.TIMESTAMP)
+
     def test_sleep_timestamps_and_missing_bedtime(self):
         from datetime import datetime
 
