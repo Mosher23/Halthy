@@ -7,6 +7,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4-beta] - 2026-09-11
+
+### Added
+
+- Support for the iOS app's Awake, Core sleep, Deep sleep, and REM sleep duration metrics (`sleep_awake`, `sleep_core`, `sleep_deep`, and `sleep_rem`).
+- Sleep-stage metrics use hours, Home Assistant's duration device class, and a suggested display precision of two decimal places.
+- Regression tests for sleep-stage names, stable metric keys, selection management, units, and display precision.
+
+### Compatibility
+
+- Requires an iOS app version that uploads the new sleep-stage metrics. Enable the desired metrics in the app, update the integration, restart Home Assistant, and upload data.
+
 ## [0.1.3-beta] - 2026-09-09
 
 ### Fixed
@@ -77,7 +89,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and per-user workout calendars.
 - Optional activity logging and app command controls.
 
-[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.3-beta...HEAD
+[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.4-beta...HEAD
+[0.1.4-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.4-beta
 [0.1.3-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.3-beta
 [0.1.2-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.2-beta
 [0.1.1-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.1-beta
