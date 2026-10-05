@@ -7,10 +7,17 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.5-beta] - 2026-10-05
+
 ### Added
 
-- Four Digital health sensors: screen time, longest activity session, first pickup time, and pickups without app use. Duration, timestamp, and count metadata now match the app payload.
-- Regression coverage for Digital health upload, entity naming, units, icons, and selection-based removal.
+- Four Digital health sensors: screen time, longest activity session, first pickup time, and pickups without app use.
+- Readable names, icons, and appropriate duration, timestamp, and count handling for the new sensors.
+- Regression tests for uploads and selection-based sensor removal.
+
+### Compatibility
+
+- Requires an updated Halthy iOS build that uploads Digital health metrics and includes them in its selected-metrics payload. Older builds may remove these sensors during a regular HealthKit sync.
 
 ## [0.1.4-beta] - 2026-09-11
 
@@ -94,7 +101,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and per-user workout calendars.
 - Optional activity logging and app command controls.
 
-[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.4-beta...HEAD
+[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.5-beta...HEAD
+[0.1.5-beta]: https://github.com/Mosher23/Halthy/compare/v0.1.4-beta...v0.1.5-beta
 [0.1.4-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.4-beta
 [0.1.3-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.3-beta
 [0.1.2-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.2-beta
