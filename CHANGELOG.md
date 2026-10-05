@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Four Digital health sensors: screen time, longest activity session, first pickup time, and pickups without app use. Duration, timestamp, and count metadata now match the app payload.
+- Regression coverage for Digital health upload, entity naming, units, icons, and selection-based removal.
+
 ## [0.1.4-beta] - 2026-09-11
 
 ### Added

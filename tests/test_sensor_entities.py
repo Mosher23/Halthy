@@ -68,6 +68,26 @@ class SensorEntityTests(unittest.TestCase):
             sensor._apply_state(original)
             self.assertEqual(sensor.native_value, datetime.fromisoformat(original.state))
 
+    def test_digital_health_entities(self):
+        for key in ("screen_time", "longest_activity_session"):
+            sensor, _ = self.make_sensor(key, 125.5, "min")
+            self.assertEqual(sensor.device_class, SensorDeviceClass.DURATION)
+            self.assertEqual(sensor.state_class, SensorStateClass.MEASUREMENT)
+            self.assertEqual(sensor.suggested_display_precision, 1)
+            self.assertEqual(sensor.native_unit_of_measurement, "min")
+        pickups, _ = self.make_sensor("pickups_without_app_use", 4, "count")
+        self.assertEqual(pickups.state_class, SensorStateClass.MEASUREMENT)
+        self.assertEqual(pickups.native_unit_of_measurement, "count")
+        first_pickup, original = self.make_sensor(
+            "first_pickup_time", "2026-09-08T21:24:40Z", None
+        )
+        self.assertEqual(first_pickup.device_class, SensorDeviceClass.TIMESTAMP)
+        self.assertEqual(first_pickup.native_value.isoformat(), "2026-09-08T21:24:40+00:00")
+        self.assertIsNone(first_pickup.state_class)
+        first_pickup._apply_state(replace(original, state="unknown"))
+        self.assertIsNone(first_pickup.native_value)
+        self.assertEqual(first_pickup.device_class, SensorDeviceClass.TIMESTAMP)
+
     def make_sensor(self, key, value, unit):
         state = runtime_module.HalthySensorState(
             unique_id=f"tester_{key}", metric_key=key, name="Body mass" if key == "body_mass" else key,
