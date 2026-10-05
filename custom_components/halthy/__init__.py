@@ -93,6 +93,7 @@ from .runtime import (
 from .statistics import (
     commit_statistics_cursor_updates as _commit_statistics_cursor_updates,
     import_statistics_batches,
+    metadata_statistic_id,
     prepare_statistics_imports_for_runtime as _prepare_statistics_imports_for_runtime,
     statistics_candidates_from_sensor as _statistics_candidates_from_sensor,
 )
@@ -1923,8 +1924,11 @@ class HalthyPushView(HomeAssistantView):
                         source_device_id=device_id,
                         updated_at=received_at,
                     )
-                runtime_statistics_batches, runtime_cursor_updates = (
-                    _prepare_statistics_imports_for_runtime(runtime, runtime_statistics_candidates)
+                runtime_statistics_batches, runtime_cursor_updates = await hass.async_add_executor_job(
+                    _prepare_statistics_imports_for_runtime,
+                    runtime,
+                    runtime_statistics_candidates,
+                    Path(hass.config.path(".storage/halthy_statistics.sqlite")),
                 )
                 if runtime_statistics_batches:
                     statistics_jobs.append(
@@ -1942,12 +1946,19 @@ class HalthyPushView(HomeAssistantView):
                 async_dispatcher_send(hass, workout_calendar_updated_signal(entry_id))
 
         imported_statistics_samples = 0
+        failed_statistic_ids: set[str] = set()
         for runtime, runtime_statistics_batches, runtime_cursor_updates in statistics_jobs:
             imported_count, successful_statistic_ids = await _async_import_statistics_batches(
                 hass,
                 runtime_statistics_batches,
             )
             imported_statistics_samples += imported_count
+            failed_statistic_ids.update(
+                statistic_id
+                for metadata, _rows in runtime_statistics_batches
+                if (statistic_id := metadata_statistic_id(metadata))
+                and statistic_id not in successful_statistic_ids
+            )
             if successful_statistic_ids and runtime_cursor_updates:
                 async with _runtime_lock(runtime):
                     _commit_statistics_cursor_updates(
@@ -1956,6 +1967,15 @@ class HalthyPushView(HomeAssistantView):
                         successful_statistic_ids,
                     )
         _schedule_store_save(hass)
+
+        if failed_statistic_ids:
+            return web.json_response(
+                {
+                    "error": "statistics_import_failed",
+                    "failed_statistic_ids": sorted(failed_statistic_ids),
+                },
+                status=503,
+            )
 
         accepted_total = (
             len(accepted_sensor_ids)

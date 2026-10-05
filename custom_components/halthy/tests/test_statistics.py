@@ -337,12 +337,22 @@ class StatisticsHelpersTests(unittest.TestCase):
         from unittest.mock import AsyncMock, patch
 
         async def exercise():
+            directory = tempfile.TemporaryDirectory()
+            self.addCleanup(directory.cleanup)
+
+            async def async_add_executor_job(function, *args):
+                return function(*args)
+
             runtime = BRIDGE.IntegrationRuntime(
                 configured_username="tester", app_username="tester", display_name="Tester"
             )
             hass = types.SimpleNamespace(
                 data={BRIDGE.DOMAIN: {"entries": {"entry": runtime}}},
-                config=types.SimpleNamespace(units=types.SimpleNamespace(temperature_unit="°C")),
+                config=types.SimpleNamespace(
+                    units=types.SimpleNamespace(temperature_unit="°C"),
+                    path=lambda relative: str(pathlib.Path(directory.name) / relative),
+                ),
+                async_add_executor_job=async_add_executor_job,
             )
             registry = types.SimpleNamespace(async_get_entity_id=lambda *args: None)
             queued = []
@@ -383,6 +393,13 @@ class StatisticsHelpersTests(unittest.TestCase):
                 await upload("2026-09-08T10:15:00Z")
                 self.assertEqual(len(queued), 3)
                 self.assertEqual(queued[-1][1][0].start, datetime(2026, 9, 8, 10, tzinfo=timezone.utc))
+                with patch.object(
+                    BRIDGE,
+                    "_async_import_statistics_batches",
+                    new=AsyncMock(return_value=(0, set())),
+                ):
+                    response = await upload("2026-09-08T11:15:00Z")
+                    self.assertEqual(response["kwargs"]["status"], 503)
 
         asyncio.run(exercise())
 
@@ -867,6 +884,65 @@ class StatisticsHelpersTests(unittest.TestCase):
         self.assertEqual(start.minute, 0)
         self.assertEqual(start.second, 0)
         self.assertEqual(start.microsecond, 0)
+
+    def test_separate_uploads_rebuild_the_same_hour_without_double_counting(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester",
+            app_username="tester",
+            display_name="Tester",
+        )
+        statistic_id = STATISTICS.statistics_id_for_metric("tester", "heart_rate")
+        first = {
+            "statistic_id": statistic_id,
+            "name": "Heart rate",
+            "unit": "bpm",
+            "start": datetime(2026, 9, 1, 10, 5, tzinfo=timezone.utc),
+            "value": 60.0,
+        }
+        second = {
+            **first,
+            "start": datetime(2026, 9, 1, 10, 35, tzinfo=timezone.utc),
+            "value": 90.0,
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            store = pathlib.Path(directory) / "samples.sqlite"
+            STATISTICS.prepare_statistics_imports_for_runtime(runtime, [first], store)
+            batches, _ = STATISTICS.prepare_statistics_imports_for_runtime(
+                runtime, [second], store
+            )
+            _metadata, rows = batches[0]
+            self.assertEqual(rows[0].state, 90.0)
+            self.assertEqual(rows[0].mean, 75.0)
+            self.assertEqual(rows[0].min, 60.0)
+            self.assertEqual(rows[0].max, 90.0)
+
+            retry_batches, _ = STATISTICS.prepare_statistics_imports_for_runtime(
+                runtime, [second], store
+            )
+            self.assertEqual(retry_batches[0][1][0].mean, 75.0)
+
+    def test_historical_daily_snapshot_replaces_corrected_value(self) -> None:
+        runtime = BRIDGE.IntegrationRuntime(
+            configured_username="tester", app_username="tester", display_name="Tester"
+        )
+        point = {
+            "statistic_id": STATISTICS.statistics_id_for_metric("tester", "steps"),
+            "name": "Steps",
+            "unit": "steps",
+            "start": datetime(2026, 9, 1, 21, 59, 59, tzinfo=timezone.utc),
+            "value": 4000.0,
+            "replace_at_timestamp": True,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            store = pathlib.Path(directory) / "samples.sqlite"
+            STATISTICS.prepare_statistics_imports_for_runtime(runtime, [point], store)
+            batches, _ = STATISTICS.prepare_statistics_imports_for_runtime(
+                runtime, [{**point, "value": 5000.0}], store
+            )
+            row = batches[0][1][0]
+            self.assertEqual(row.state, 5000.0)
+            self.assertEqual(row.mean, 5000.0)
 
     def test_statistics_candidates_disabled_per_runtime(self) -> None:
         runtime = BRIDGE.IntegrationRuntime(

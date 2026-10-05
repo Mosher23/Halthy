@@ -75,11 +75,15 @@ This is used for remote actions like force upload and Influx backfill.
 To improve history inside Home Assistant:
 
 - When a pushed numeric metric includes `measurement_timestamp`, Halthy imports it into recorder statistics.
-- Imports are deduplicated by per-metric cursors.
+- Repeated samples are deduplicated by metric, timestamp, and value. The integration rebuilds an hour when later upload batches add samples to it.
 - Statistics are external Home Assistant long-term statistics, so they are bucketed hourly by design.
 - Home Assistant's 5-minute short-term statistics apply to normal recorder-derived sensor statistics, not these historical `halthy:*` imports.
 
 For full raw sample history and advanced analytics, use optional InfluxDB export.
+
+In the iOS app's Home Assistant settings, choose **Home Assistant history** (7, 30, 90, or 365 days, or all available) and tap **Backfill Home Assistant history** to start or continue a historical import. The app uploads incremental HealthKit readings in bounded batches and resumes from saved anchors. It also imports daily snapshots for selected sleep and cumulative metrics a few days at a time on later syncs. The first import can take many syncs for a long history range.
+
+To combine samples that arrive in different batches, the integration keeps a deduplicated sample store at `/config/.storage/halthy_statistics.sqlite`. This file grows with the number of samples sent and should be included in Home Assistant backups.
 
 ## 🧩 Install and Setup
 

@@ -7,6 +7,15 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Resumable Home Assistant history range selection in the iOS app, with a backfill action and historical daily snapshots for sleep and cumulative metrics.
+- Persistent sample aggregation across upload batches for accurate hourly Home Assistant statistics.
+
+### Fixed
+
+- Home Assistant incremental uploads no longer discard readings above a per-hour cap before advancing HealthKit sync anchors.
+
 ## [0.1.5-beta] - 2026-10-05
 
 ### Added

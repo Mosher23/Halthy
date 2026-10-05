@@ -220,7 +220,9 @@ Both services accept optional `app_username` to target one configured user.
 > [!IMPORTANT]
 > Home Assistant states represent current values. Full sample history is not stored as state snapshots by default.
 
-When a numeric metric arrives with `measurement_timestamp`, the integration imports it into recorder statistics (hourly buckets, cursor-based deduplication).
+When a numeric metric arrives with `measurement_timestamp`, the integration imports it into recorder statistics. Samples received in separate upload batches are deduplicated by metric, timestamp, and value and combined into hourly buckets. The sample store is `/config/.storage/halthy_statistics.sqlite`; include it in Home Assistant backups. It grows as more samples are uploaded.
+
+In the app's Home Assistant settings, choose **Home Assistant history** and tap **Backfill Home Assistant history**. The app resumes incremental readings from saved HealthKit anchors and fills selected sleep and cumulative metrics with historical daily snapshots over later syncs. Long ranges take multiple syncs.
 
 These are external Home Assistant long-term statistics, so `halthy:*` statistic series are hourly. Home Assistant's 5-minute short-term statistics apply to normal recorder-derived sensor statistics, not these historical imports. Use InfluxDB from the app for raw high-resolution history.
 
