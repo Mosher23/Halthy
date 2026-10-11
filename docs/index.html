@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Halthy | Your health data, your Home Assistant</title>
+  <meta name="description" content="Halthy connects selected Apple Health data to your own Home Assistant and optional InfluxDB server.">
+  <link rel="redirect_uri" href="halthy-ha://auth/callback">
+  <link rel="canonical" href="https://mosher23.github.io/Halthy/">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <style>
+    :root { color-scheme: light; --ink: #262b3e; --muted: #566071; --accent: #ef2445; --paper: #fffdfb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: radial-gradient(ellipse at top left, #f9e0e4, transparent 60%), var(--paper); font-family: 'Avenir Next', Avenir, sans-serif; line-height: 1.65; }
+    main { max-width: 780px; margin: 0 auto; padding: 72px 28px; }
+    .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
+    h1 { font-family: Georgia, serif; font-size: clamp(3.5rem, 10vw, 5.5rem); line-height: 1.08; font-weight: 400; margin: 12px 0 24px; }
+    .lead { font-size: 1.3rem; max-width: 580px; }
+    section { border-top: 1px solid #ddd8d5; margin-top: 36px; padding-top: 20px; }
+    h2 { font-size: 1.15rem; }
+    p { margin: 12px 0; }
+    a { color: #ab1530; text-underline-offset: 4px; }
+    a:hover { color: #761025; }
+    a:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 2px; }
+    nav { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 30px; }
+    small { display: block; margin-top: 36px; color: var(--muted); }
+    @media (max-width: 480px) { main { padding: 42px 22px; } .lead { font-size: 1.12rem; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Apple Health &middot; Home Assistant</p>
+    <h1>Halthy.</h1>
+    <p class="lead">Your health data, connected to the home you control.</p>
+    <p>Halthy reads the Apple Health metrics you select and can send them directly to your own Home Assistant instance. Optional InfluxDB export keeps your history in a destination you configure.</p>
+    <nav aria-label="Halthy links">
+      <a href="https://apps.apple.com/app/halthy/id6798250587">View Halthy on the App Store</a>
+      <a href="https://github.com/Mosher23/Halthy">Integration repository</a>
+      <a href="https://github.com/Mosher23/Halthy/issues">Support</a>
+    </nav>
+    <section aria-labelledby="connection">
+      <h2 id="connection">About Home Assistant sign-in</h2>
+      <p>This page identifies Halthy to Home Assistant and declares the approved return address for the app's sign-in flow. The browser returns directly to the app, not to this website.</p>
+      <p>Native sign-in is being developed. The currently released app uses manual-token setup; publishing this page does not change that setup or enable the new flow.</p>
+    </section>
+    <section aria-labelledby="privacy">
+      <h2 id="privacy">No health-data relay</h2>
+      <p>This static page has no sign-in form, scripts or analytics. It does not accept Home Assistant credentials, authentication codes or health data. App-to-server communication remains direct.</p>
+      <p><a href="https://github.com/Mosher23/Halthy/blob/main/PRIVACY.md">Read the Halthy privacy policy</a></p>
+    </section>
+    <small>GitHub hosts this public page. Home Assistant and Apple are separate products; Halthy is not affiliated with or endorsed by their providers.</small>
+  </main>
+</body>
+</html>
