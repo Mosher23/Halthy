@@ -23,6 +23,24 @@ runtime_module = import_module(f"{package.__name__}.runtime")
 
 
 class SensorEntityTests(unittest.TestCase):
+    def test_daily_reset_publishes_zero_and_unknown_without_claiming_a_phone_upload(self):
+        from datetime import datetime, timezone
+        daily = import_module(f"{package.__name__}.daily_reset")
+        now = datetime(2026, 10, 15, 0, tzinfo=timezone.utc)
+        before = datetime(2026, 10, 14, 20, tzinfo=timezone.utc)
+        for key, state, unit in (("steps", 9000, "count"), ("screen_time", 90, "min"),
+                                 ("first_pickup_time", before.isoformat(), None)):
+            entity, original = self.make_sensor(key, state, unit)
+            record = replace(original, updated_at=before, attributes={"measurement_timestamp": before.isoformat()})
+            sensors = {record.unique_id: record}
+            daily.rollover_daily_sensors(sensors, now, "UTC")
+            entity._apply_state(sensors[record.unique_id])
+            self.assertEqual(entity.native_value, None if key == "first_pickup_time" else 0)
+            self.assertEqual(entity.unique_id, record.unique_id)
+            self.assertEqual(entity.extra_state_attributes["last_pushed"], before.isoformat())
+            self.assertIs(entity.extra_state_attributes["daily_source_fresh"], False)
+            self.assertEqual(entity.extra_state_attributes["source_measurement_timestamp"], before.isoformat())
+
     def test_statistics_metadata_is_accepted_by_recorder(self):
         from datetime import datetime, timezone
         from unittest.mock import Mock, patch

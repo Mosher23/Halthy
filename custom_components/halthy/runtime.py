@@ -82,6 +82,8 @@ class IntegrationRuntime:
     last_force_upload_ack_status: str | None = None
     daily_upload_count: int = 0
     daily_upload_count_day: str = ""
+    map_journal_scope: dict[str, str] | None = None
+    map_journal_error: str | None = None
     lock: asyncio.Lock | None = None
 
 

@@ -110,11 +110,7 @@ class HalthySensor(SensorEntity):
     def _apply_state(self, state: HalthySensorState) -> None:
         self._sensor_state = state
         metric_key = normalize_metric_key(state.metric_key)
-        self._attr_name = (
-            friendly_metric_name(metric_key, state.name)
-            if metric_key in {"body_mass", "weight"}
-            else state.name
-        )
+        self._attr_name = friendly_metric_name(metric_key, state.name)
         self._attr_native_value = state.state
         self._attr_native_unit_of_measurement = state.unit
         self._attr_suggested_unit_of_measurement = None
@@ -183,7 +179,10 @@ class HalthySensor(SensorEntity):
         attrs.setdefault("metric_key", state.metric_key)
         attrs.setdefault("username", state.username)
         attrs.setdefault("device_id", state.device_id)
-        attrs["last_pushed"] = state.updated_at.isoformat()
+        attrs["last_pushed"] = (
+            attrs.get("last_source_pushed", state.updated_at.isoformat())
+            if attrs.get("daily_reset") is True else state.updated_at.isoformat()
+        )
         self._attr_extra_state_attributes = attrs
 
     @property

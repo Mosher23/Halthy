@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.components.image import ImageEntity
@@ -361,6 +362,8 @@ class HalthyImage(ImageEntity):
 
     @callback
     def _apply_state(self, state: HalthyImageState) -> None:
+        self._attr_available = True
+        self._attr_image_last_updated = state.updated_at
         self._image_state = state
         self._attr_name = state.name
         self._attr_content_type = state.content_type
@@ -379,6 +382,14 @@ class HalthyImage(ImageEntity):
             self._workout_state = "Workout"
         self._attr_extra_state_attributes = attrs
 
+    @callback
+    def _clear_state(self) -> None:
+        self._attr_available = False
+        self._attr_extra_state_attributes = {}
+        self._attr_image_last_updated = datetime.now(timezone.utc)
+        self._cached_image = None
+        self._workout_state = "Workout"
+
     @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
@@ -389,6 +400,8 @@ class HalthyImage(ImageEntity):
         )
 
     async def async_image(self) -> bytes | None:
+        if not self.available:
+            return None
         return self._image_state.image_bytes
 
     @property
@@ -406,6 +419,8 @@ class HalthyImage(ImageEntity):
         def async_handle_image_update() -> None:
             state = self._runtime.images.get(self._image_unique_id)
             if state is None:
+                self._clear_state()
+                self.async_write_ha_state()
                 return
             self._apply_state(state)
             self.async_write_ha_state()
