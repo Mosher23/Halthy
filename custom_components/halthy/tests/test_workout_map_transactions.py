@@ -678,6 +678,7 @@ class WorkoutMapTransactionTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await BRIDGE.async_setup_entry(self.hass, entry))
         restored = domain["entries"]["entry"]
         self.assertIsNot(restored, self.runtime)
+        self.assertEqual(restored.integration_version, "test-installed-version")
         self.assertEqual(next(iter(restored.images.values())).image_bytes, b"\xff\xd8\xff\x00")
         self.assertEqual((await self.state())["args"][0]["state"], written["state"])
         self.hass.config_entries.async_forward_entry_setups.assert_awaited_once()

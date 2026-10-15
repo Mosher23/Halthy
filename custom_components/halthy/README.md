@@ -24,7 +24,7 @@ Project documentation, privacy information, and security reporting instructions 
 
 ### Stable release and app compatibility
 
-Version 0.2.0 is a stable integration release. The iPhone app is distributed
+Version 0.2.1 is a stable integration release. The iPhone app is distributed
 separately through TestFlight. Existing token-authenticated API uploads remain
 supported; native sign-in and paired webhooks require a compatible updated app.
 
@@ -125,6 +125,17 @@ single event), stood hours exclude idle records, and symptom counts exclude
 records marked not present. Test/observation category counts count logged records,
 not positive clinical results. Complete empty daily counter reads report zero;
 query failures and unavailable sleep/medical readings do not become zero.
+
+Existing graphs retain their previously recorded values after an update. The
+midnight fix applies to new state history after the integration is restarted;
+it does not move an old morning reset back to midnight or rewrite old statistics.
+
+### Device software version
+
+Device info shows the installed integration's software version as **Integration
+<version>**, not the iPhone's iOS version or the app's TestFlight build. The version
+comes from Home Assistant's loaded integration manifest and refreshes on restart
+or integration reload. Device and entity identifiers are preserved.
 
 ## Built-in Workout Card
 

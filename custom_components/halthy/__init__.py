@@ -36,6 +36,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_change, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
+from homeassistant.loader import async_get_integration
 
 try:
     from homeassistant.components.recorder.statistics import async_add_external_statistics
@@ -3097,6 +3098,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from config entry."""
+    integration = await async_get_integration(hass, DOMAIN)
+    integration_version = integration.version
     domain_data = hass.data.setdefault(
         DOMAIN,
         {
@@ -3225,6 +3228,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         daily_upload_count=daily_upload_count,
         daily_upload_count_day=daily_upload_count_day,
         map_journal_scope=stored_entry.get("map_journal_scope"),
+        integration_version=str(integration_version) if integration_version is not None else None,
     )
 
     stored_sensors = stored_entry.get("sensors", {})

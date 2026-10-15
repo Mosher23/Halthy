@@ -7,6 +7,20 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-15
+
+### Added
+
+- Device info displays the installed Halthy integration version, explicitly labeled as Integration rather than the iPhone's OS version. All entity platforms share this metadata and existing devices update in place.
+
+### Documentation
+
+- Clarify that midnight rollover applies to new history after restart and does not rewrite previously recorded graphs.
+
+### Compatibility
+
+- No iOS rebuild is required for the Device info version display. Update the integration and restart Home Assistant.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

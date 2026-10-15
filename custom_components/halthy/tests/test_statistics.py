@@ -179,6 +179,12 @@ def _install_homeassistant_stubs() -> None:
     if not hasattr(config_entries_module, "ConfigEntry"):
         config_entries_module.ConfigEntry = type("ConfigEntry", (), {})
 
+    loader_module = sys.modules.setdefault("homeassistant.loader", types.ModuleType("homeassistant.loader"))
+    if not hasattr(loader_module, "async_get_integration"):
+        async def _integration(_hass, _domain):
+            return types.SimpleNamespace(version="test-installed-version")
+        loader_module.async_get_integration = _integration
+
     core_module = sys.modules.setdefault(
         "homeassistant.core",
         types.ModuleType("homeassistant.core"),

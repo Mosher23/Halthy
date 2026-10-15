@@ -18,10 +18,9 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import DistanceConverter, MassConverter
 
-from .runtime import HalthySensorState, IntegrationRuntime, runtime_device_identifiers
+from .runtime import HalthySensorState, IntegrationRuntime, runtime_device_info
 from .const import (
     DOMAIN,
-    MANUFACTURER,
     new_sensor_signal,
     remove_sensor_signal,
     update_sensor_signal,
@@ -187,12 +186,7 @@ class HalthySensor(SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        return DeviceInfo(
-            identifiers=runtime_device_identifiers(self._runtime),
-            manufacturer=MANUFACTURER,
-            model="iOS App",
-            name=self._runtime.display_name,
-        )
+        return runtime_device_info(self._runtime)
 
     async def async_added_to_hass(self) -> None:
         """Register update callback."""
