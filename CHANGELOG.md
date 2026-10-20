@@ -9,6 +9,7 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Declared Health & wellbeing (`health_wellbeing`) as the integration's primary category in its manifest.
 - Resumable Home Assistant history range selection in the iOS app, with a backfill action and historical daily snapshots for sleep and cumulative metrics.
 - Persistent sample aggregation across upload batches for accurate hourly Home Assistant statistics.
 

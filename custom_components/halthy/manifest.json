@@ -5,6 +5,9 @@
     "lovelace",
     "recorder"
   ],
+  "categories": [
+    "health_wellbeing"
+  ],
   "codeowners": [
     "@Mosher23"
   ],
