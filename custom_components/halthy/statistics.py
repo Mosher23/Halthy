@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import datetime
 import inspect
 import logging
@@ -185,7 +186,8 @@ def _stored_hourly_samples(
 
     database_path.parent.mkdir(parents=True, exist_ok=True)
     affected: dict[str, set[tuple[str, datetime]]] = {}
-    with sqlite3.connect(database_path, timeout=30) as connection:
+    # SQLite's transaction context commits/rolls back but does not close.
+    with closing(sqlite3.connect(database_path, timeout=30)) as connection, connection:
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS samples ("

@@ -7,15 +7,56 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-20
+
+### Changed
+
+- Declare Health & wellbeing (`health_wellbeing`) as Halthy's primary integration category, following Home Assistant's integration-category guidance.
+
+### Compatibility
+
+- No iOS app update is required for this metadata change. Update the integration and restart Home Assistant.
+
+## [0.2.1] - 2026-10-15
+
 ### Added
 
-- Declared Health & wellbeing (`health_wellbeing`) as the integration's primary category in its manifest.
+- Device info displays the installed Halthy integration version, explicitly labeled as Integration rather than the iPhone's OS version. All entity platforms share this metadata and existing devices update in place.
+
+### Documentation
+
+- Clarify that midnight rollover applies to new history after restart and does not rewrite previously recorded graphs.
+
+### Compatibility
+
+- No iOS rebuild is required for the Device info version display. Update the integration and restart Home Assistant.
+
+## [0.2.0] - 2026-10-15
+
+### Added
+
+- Native Home Assistant sign-in discovery and optional per-device paired webhook uploads. Pairing, lookup and revocation remain authenticated and bound to the owning Home Assistant account and grant.
+- Durable command acknowledgements and scoped workout-map transaction, inspection and archive-repair endpoints for compatible app builds.
+- Independent midnight rollover for daily activity, energy, dietary, event, workout and Digital health totals, including catch-up after restart or reload and calendar/timezone-aware day boundaries.
+- Freshness attributes distinguish local daily resets from phone uploads. First pickup time clears to unknown; sleep sessions and last medical measurements are preserved.
+- Regression coverage for API/webhook delivery, daily rollover, historical retries, sensor compatibility and authentication using an isolated Home Assistant server.
 - Resumable Home Assistant history range selection in the iOS app, with a backfill action and historical daily snapshots for sleep and cumulative metrics.
 - Persistent sample aggregation across upload batches for accurate hourly Home Assistant statistics.
 
 ### Fixed
 
+- Previous-day uploads and historical daily snapshots no longer restore yesterday's daily totals into today's live entities; historical samples remain eligible for statistics import.
+- Completed sync receipts update Last full sync and Daily uploads independently of whether the payload contains changed readings. Calendar resets do not falsely count as uploads.
+- Repair fragmented display names such as Handwashing, Swimming, Rowing and Skiing without renaming existing entity or statistics IDs.
+- Keep workout-image replacement, archive repair and retries scoped to their destination and requested operation.
 - Home Assistant incremental uploads no longer discard readings above a per-hour cap before advancing HealthKit sync anchors.
+
+### Compatibility
+
+- This is a stable integration release, not a prerelease. The separately distributed iPhone app remains available through TestFlight.
+- Existing authenticated API uploads remain supported. Native sign-in, paired webhooks and correct daily event aggregation require a compatible updated Halthy app.
+- Digital health retains Apple's device, region, OS and permission restrictions.
+- Back up Home Assistant before upgrading, install the update and restart Home Assistant. Open the updated app and sync once. Existing recorder history is not rewritten by the midnight fix.
 
 ## [0.1.5-beta] - 2026-10-05
 
@@ -111,7 +152,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and per-user workout calendars.
 - Optional activity logging and app command controls.
 
-[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.1.5-beta...HEAD
+[Unreleased]: https://github.com/Mosher23/Halthy/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Mosher23/Halthy/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/Mosher23/Halthy/releases/tag/v0.2.1
+[0.2.0]: https://github.com/Mosher23/Halthy/releases/tag/v0.2.0
 [0.1.5-beta]: https://github.com/Mosher23/Halthy/compare/v0.1.4-beta...v0.1.5-beta
 [0.1.4-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.4-beta
 [0.1.3-beta]: https://github.com/Mosher23/Halthy/releases/tag/v0.1.3-beta

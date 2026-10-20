@@ -25,9 +25,11 @@ Halthy does not operate a central backend. Health, workout, and route data are s
 ## ✨ Features
 
 - Direct push from iPhone to Home Assistant via `POST /api/halthy/push`
+- Native Home Assistant sign-in and optional per-device paired webhook uploads with a compatible updated app
 - Per-person setup with stable unique IDs and predictable entity IDs
 - Readable metric names with metric-specific icons and standardized units
 - Optional Digital health sensors for screen time, longest activity session, first pickup time, and pickups without app use on eligible iPhones
+- Independent midnight reset for daily totals, including Digital health, without waking the iPhone
 - Workout route map support (`image.*` entities)
 - Workout image archive in Home Assistant media storage with same-workout replacement
 - Read-only Home Assistant workout calendar for every configured person
@@ -57,6 +59,16 @@ Halthy does not operate a central backend. Health, workout, and route data are s
    - `sensor.<app_username>_<metric_key>`
    - `image.<app_username>_workout`
    - diagnostic sensors for sync status
+
+Compatible updated apps can sign in through Home Assistant and optionally pair a
+per-device webhook for uploads. Existing token-authenticated API uploads remain
+supported. Webhook pairing and revocation, commands and other control operations
+still require authentication. Keep webhook URLs private.
+
+Daily totals reset at midnight independently of phone uploads; first pickup time
+clears to unknown. Sleep-session results and last medical readings are retained.
+See [midnight rollover](custom_components/halthy/README.md#midnight-rollover) for
+timezone, freshness and delayed-upload handling.
 
 ### 📥 Command Path (Home Assistant -> App)
 
@@ -371,10 +383,12 @@ Each configured person gets diagnostic entities:
 - `sensor.<app_username>_last_update`
   - Timestamp of the latest accepted update for that user
 - `sensor.<app_username>_last_full_sync`
-  - Timestamp of the latest full sync that applied at least one change
+  - Timestamp of the latest completed current-readings sync, including a sync with unchanged readings
+  - Native app sessions explicitly confirm completion after current-day metrics; historical backfill and individual incremental requests do not count as full syncs
 - `sensor.<app_username>_daily_upload_count`
   - Number of full sync uploads accepted for current local day
   - Automatically resets daily
+  - A duplicate-only completed session counts once per completion request; failed statistics imports do not count
 
 You also get config/control entities per user:
 

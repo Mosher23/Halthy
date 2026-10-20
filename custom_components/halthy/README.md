@@ -22,6 +22,28 @@ Project documentation, privacy information, and security reporting instructions 
 
 ## Installation
 
+### Stable release and app compatibility
+
+Version 0.2.1 is a stable integration release. The iPhone app is distributed
+separately through TestFlight. Existing token-authenticated API uploads remain
+supported; native sign-in and paired webhooks require a compatible updated app.
+
+The app discovers profiles owned by the signed-in Home Assistant account. Optional
+webhook pairing is scoped to that account, profile, device and issuing grant.
+Webhook URLs are secrets: do not publish or share them. Pairing lookup and removal
+require authenticated requests; lookup never returns the secret webhook URL.
+Commands, imports and other control operations continue to use authentication.
+
+Compatible apps also use scoped workout-map inspection/transaction endpoints and
+archive-only repair. An archive-only write does not replace the displayed map or
+advance sync diagnostics. Durable receipts protect retries; they are not backups
+and cannot undo remote writes. Back up Home Assistant before upgrading or rolling
+back. Do not manually activate map-management endpoints as a setup step.
+
+Validation includes real HA 2025.6.3 authentication, loopback HTTP and synthetic
+users/grants in `tests/test_http_authentication.py`. This is not a full supported-
+version matrix or a substitute for checking your own deployment after upgrading.
+
 ### HACS (recommended)
 
 1. Open **HACS**.
@@ -77,6 +99,43 @@ On an eligible iPhone with Digital health data-access permission, select the met
 | `sensor.<username>_pickups_without_app_use` | Current day's count of pickups without app use |
 
 The app sends the current-day snapshot to Home Assistant and can export the past seven days to InfluxDB. These are device-level aggregates: no app identities or website history are sent. Update both the app and integration, then run a sync. Deselecting a Digital health metric removes its sensor on the next selection-pruning upload.
+
+### Midnight rollover
+
+Daily activity, energy, dietary totals, event counts, workout totals, screen time,
+longest activity session and pickups without app use reset to **0 at 00:00**.
+First pickup time becomes **unknown** until today's first pickup is reported.
+Sleep-session results, medical measurements and last-workout timestamps are not
+daily counters and retain their last result.
+
+The integration performs rollover without an iPhone upload and catches up after
+a restart or reload. It uses each snapshot's `reporting_time_zone`; older app
+payloads fall back to Home Assistant's timezone. Calendar days, including daylight
+saving changes, are used rather than fixed 24-hour intervals. Daily uploads uses
+Home Assistant's timezone.
+
+`daily_reset: true` and `daily_source_fresh: false` distinguish a calendar reset
+from a fresh phone measurement. `last_pushed` retains the actual phone receipt
+time. Resetting a daily value does not increment Daily uploads or change Last full
+sync. Previous-day retries and historical daily snapshots can update historical
+statistics but cannot replace today's live total. Existing entity IDs are kept.
+
+Update the app too: category sensors now count today's events (not the latest
+single event), stood hours exclude idle records, and symptom counts exclude
+records marked not present. Test/observation category counts count logged records,
+not positive clinical results. Complete empty daily counter reads report zero;
+query failures and unavailable sleep/medical readings do not become zero.
+
+Existing graphs retain their previously recorded values after an update. The
+midnight fix applies to new state history after the integration is restarted;
+it does not move an old morning reset back to midnight or rewrite old statistics.
+
+### Device software version
+
+Device info shows the installed integration's software version as **Integration
+<version>**, not the iPhone's iOS version or the app's TestFlight build. The version
+comes from Home Assistant's loaded integration manifest and refreshes on restart
+or integration reload. Device and entity identifiers are preserved.
 
 ## Built-in Workout Card
 
@@ -170,6 +229,13 @@ Enable or disable **Import historical statistics** independently for each config
 - Always Fahrenheit
 
 ### Activity Log Mode
+
+Native API and paired-webhook uploads report `sync_completed: true` after a
+successful current-metric collection. This refreshes **Last full sync** and
+**Daily uploads** without pruning other sensors. Historical pages and retries
+do not count as additional full-sync sessions. Historical backfill can still be
+pending after a current-metric sync completes. The app checks the integration's
+`sync_completion_supported` capability before sending this metadata.
 
 | Mode | Behavior |
 |---|---|
