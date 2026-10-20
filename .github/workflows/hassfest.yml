@@ -14,5 +14,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      - name: Checkout category-aware Hassfest source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: home-assistant/core
+          ref: 1d6681b0a21e92ca776e9bffcd1dd74daffe5391 # 2026-10-20, supports custom integration categories
+          path: .hassfest-core
+          persist-credentials: false
+
+      - name: Build category-aware Hassfest
+        run: >-
+          docker build
+          --file .hassfest-core/script/hassfest/docker/Dockerfile
+          --tag ghcr.io/home-assistant/hassfest:latest
+          .hassfest-core
+
       - name: Run Hassfest
         uses: home-assistant/actions/hassfest@a7c616ce81ccda50150bf1595786c71b1883fabb # master, 2026-08-03

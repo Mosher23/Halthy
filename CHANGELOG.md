@@ -13,6 +13,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Declare Health & wellbeing (`health_wellbeing`) as Halthy's primary integration category, following Home Assistant's integration-category guidance.
 
+### Fixed
+
+- Build Hassfest from a pinned official Home Assistant Core revision that supports categories in custom integration manifests, keeping all validation checks enabled.
+
 ### Compatibility
 
 - No iOS app update is required for this metadata change. Update the integration and restart Home Assistant.
