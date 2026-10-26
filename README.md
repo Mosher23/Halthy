@@ -18,7 +18,8 @@ The app talks directly to your Home Assistant instance. There is no external Hal
 - Security policy: [`SECURITY.md`](SECURITY.md)
 - Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Release history: [`CHANGELOG.md`](CHANGELOG.md)
-- Support and issue tracker: [GitHub Issues](https://github.com/Mosher23/Halthy/issues)
+- Support page and contact details: [`SUPPORT.md`](SUPPORT.md)
+- Bug reports and feature requests: [GitHub Issues](https://github.com/Mosher23/Halthy/issues)
 
 Halthy does not operate a central backend. Health, workout, and route data are sent only to user-configured destinations such as Home Assistant and optional InfluxDB. The iOS app stores access tokens in Keychain and uses HealthKit permissions only for selected app functionality.
 
@@ -431,3 +432,4 @@ Use this when you want:
 ## 📄 License
 
 Halthy is available under the [MIT License](LICENSE).
+
