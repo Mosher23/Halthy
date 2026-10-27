@@ -1,4 +1,42 @@
-# Timestamps, statistics, and integration icons
+# Troubleshooting
+
+## App cannot find an existing profile after API setup
+
+An entry created through Home Assistant's config-flow API may have no owner.
+Discovery only returns profiles owned by the signed-in account and does not claim
+profiles automatically.
+
+As a Home Assistant administrator, open **Developer Tools → Actions** and run
+**Halthy: Assign profile owner** (`halthy.assign_profile_owner`). Select the
+Halthy integration entry and enter the intended Home Assistant user's ID as
+`owner_user_id`. Then sign in again in Halthy. The target user must be active.
+This action repairs an ownerless profile; it cannot transfer an already owned
+profile to another user.
+
+## A workout fails to upload
+
+Updated app builds identify the workout date, type, preparation stage, named
+error and attempt number in technical logs. Failed items are retained locally
+and retried separately with backoff; later calendar records can still upload.
+After three unsuccessful preparation attempts, a force-upload request reports
+failure and acknowledges that result instead of staying unfinished. The failed
+items and command evidence remain saved. **Recheck sources** makes normal-sync
+items eligible for another retry; a new force-upload request starts a new export.
+
+For calendar automation without maps, enable **Workout metadata only** under
+**Settings → Home Assistant → Maps and appearance**. This skips route collection,
+weather and rendering. Queued images and archive repairs remain retained and
+paused. If an earlier force-upload request included images, it finishes as failed
+without changing its original manifest; request a new force upload to use the
+metadata-only policy. Data already uploaded to Home Assistant is retained.
+
+## GymKit equipment details
+
+Supported app builds preserve available machine distance, duration, equipment
+name/model and workout measurements in calendar records even without a route.
+Machine duration is shown separately from workout duration. Cycling cadence is
+displayed in rpm. Missing optional measurements do not prevent the basic workout
+from uploading.
 
 ## Sleep timestamps and local time
 

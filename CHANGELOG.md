@@ -7,6 +7,23 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-27
+
+### Fixed
+
+- Preserve recently uploaded workouts, including workouts without route images, when saving options or reloading the integration. Flush current runtime state before unloading and retain other profiles during delayed saves. Fixes #8.
+
+### Added
+
+- Add the administrator-only `halthy.assign_profile_owner` action to repair ownerless profiles created through the config-flow API. Validate active users, prevent ownership transfers, and retain read-only, account-scoped discovery. Addresses #9.
+- Preserve available GymKit machine duration, equipment name/model/manufacturer, steps and cadence units in workout storage, calendar descriptions and workout-card details. Cycling cadence displays in rpm. Supports #11 with compatible app uploads.
+- Add regression tests for reload persistence, ownership repair and authorization, GymKit metadata, and workout-card rendering and escaping.
+
+### Compatibility
+
+- Update the integration through HACS and restart Home Assistant. The reload fix and ownership-repair action work with existing app builds.
+- The iOS app is distributed separately. GymKit metadata export, per-workout retry isolation, calendar-first uploads and the metadata-only option require a compatible updated Halthy app; this integration release alone does not resolve the iOS preparation failures reported in #10 and #12.
+
 ## [0.2.2] - 2026-10-20
 
 ### Changed

@@ -14,6 +14,7 @@ Contributions are welcome through GitHub issues and pull requests.
 python3 -m compileall -q custom_components
 python3 -m unittest discover custom_components/halthy/tests -p 'test_*.py'
 node --check custom_components/halthy/halthy-workout-card.js
+node tests/workout_card_gymkit.test.cjs
 git diff --check
 ```
 

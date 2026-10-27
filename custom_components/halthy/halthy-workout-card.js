@@ -1231,6 +1231,8 @@ class HalthyWorkoutCard extends HTMLElement {
       <div class="headline-row">
         <div class="headline-main">
           <div class="name">${this._escape(title)}</div>
+          ${(workout.details?.summary || []).filter((metric) => metric.label === "Equipment")
+            .map((metric) => `<div class="date">${this._escape(metric.value)}</div>`).join("")}
           ${workout.dateLabel ? `<div class="date">${this._escape(workout.dateLabel)}</div>` : ""}
         </div>
         ${calendarButtonHtml}
@@ -1385,6 +1387,10 @@ class HalthyWorkoutCard extends HTMLElement {
     }
 
     const sections = [
+      this._renderMetricSection("Workout", details.summary),
+      this._renderMetricSection("Heart and power", details.heart),
+      this._renderMetricSection("Speed and cadence", details.speed),
+      this._renderMetricSection("Elevation and weather", details.elevation),
       this._config.show_heart_rate_zones !== false
         ? this._renderZoneSection("Heart-rate zones", details.heartZones, "hr")
         : "",
@@ -1569,6 +1575,10 @@ class HalthyWorkoutCard extends HTMLElement {
     ].filter(Boolean);
 
     const summary = [
+      this._metric("Equipment", this._firstString(item.workout_device_name, item.workout_device_model)),
+      this._metric("Model", this._firstString(item.workout_device_model)),
+      this._metric("Machine duration", this._formatDuration(this._toNumber(item.workout_machine_duration_s))),
+      this._metric("Steps", this._formatRoundedUnit(this._toNumber(item.workout_step_count), "steps")),
       this._metric("Duration", this._formatDuration(durationS)),
       this._metric("Distance", this._formatDistance(distanceM)),
       this._metric("Active energy", this._formatRoundedUnit(activeEnergyKcal, "kcal")),
@@ -1587,7 +1597,7 @@ class HalthyWorkoutCard extends HTMLElement {
       this._metric("Average speed", this._formatSpeed(avgSpeedMps)),
       this._metric("Highest speed", this._formatSpeed(maxSpeedMps)),
       this._metric("Lowest speed", this._formatSpeed(minSpeedMps)),
-      this._metric("Cadence", this._formatRoundedUnit(cadenceSpm, "spm")),
+      this._metric("Cadence", this._formatRoundedUnit(cadenceSpm, item.workout_cadence_unit === "rpm" ? "rpm" : "spm")),
     ].filter(Boolean);
 
     const elevation = [
@@ -2957,6 +2967,11 @@ class HalthyWorkoutCard extends HTMLElement {
     }
     return [
       this._weatherSignature(item),
+      String(item.workout_device_name ?? ""),
+      String(item.workout_device_model ?? ""),
+      String(item.workout_machine_duration_s ?? ""),
+      String(item.workout_step_count ?? ""),
+      String(item.workout_cadence_unit ?? ""),
       String(item.workout_distance_m ?? item.distance_m ?? item.distance ?? ""),
       String(item.workout_duration_s ?? item.duration_s ?? item.duration_seconds ?? item.duration ?? ""),
       String(item.workout_active_energy_kcal ?? item.active_energy_kcal ?? item.energy_kcal ?? ""),
