@@ -15,11 +15,6 @@ Requires iOS 18.5 or later. For pre-release builds, the optional
 the App Store release.
 
 ## Documentation, Privacy, and Support
-
-- Website and app overview: [mosher23.github.io/Halthy](https://mosher23.github.io/Halthy/)
-- Readable setup and usage guide: [Documentation](https://mosher23.github.io/Halthy/documentation.html)
-- Website support and contact: [Support](https://mosher23.github.io/Halthy/support.html)
-- Website privacy policy: [Privacy](https://mosher23.github.io/Halthy/privacy.html)
 - Home Assistant integration documentation: [`custom_components/halthy/README.md`](custom_components/halthy/README.md)
 - Privacy policy: [`PRIVACY.md`](PRIVACY.md)
 - Security policy: [`SECURITY.md`](SECURITY.md)
