@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halthy Support - Health, workouts and connected data</title>
+<meta name="description" content="Troubleshooting, common questions and a direct way to get in touch."><meta name="theme-color" content="#151a22"><meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<link rel="canonical" href="https://mosher23.github.io/Halthy/support.html"><link rel="icon" href="assets/app-icon.png"><link rel="stylesheet" href="assets/site.css">
+</head><body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><nav class="wrap nav" aria-label="Main navigation">
+<a class="brand" href="./" aria-label="Halthy home"><img src="assets/app-icon.png" width="40" height="40" alt="">Halthy<span class="brand-note">FOR IPHONE</span></a>
+<div class="nav-links"><a href="./">Overview</a><a href="documentation.html">Guide</a><a href="support.html" aria-current="page">Support</a><a class="nav-download" href="https://apps.apple.com/app/halthy/id6798250587">Get the app <span aria-hidden="true">&#8599;</span></a></div>
+</nav></header>
+<main id="main"><div class="wrap"><div class="page-heading"><p class="eyebrow">HALTHY / SUPPORT</p><h1>A little help goes a long way.</h1><p class="lead">Troubleshooting, common questions and a direct way to get in touch.</p></div></div>
+<div class="wrap contact-strip"><a class="button primary" href="mailto:tsdeveloper@pm.me">Email support</a><a class="button secondary" href="https://github.com/Mosher23/Halthy/issues">Report an issue on GitHub</a></div><div class="wrap doc-layout"><nav class="doc-nav" aria-label="On this page"><strong>ON THIS PAGE</strong><a href="#contact">Contact</a>
+<a href="#before-reporting-a-problem">Before Reporting a Problem</a>
+<a href="#common-questions">Common Questions</a>
+<a href="#information-to-include-in-a-support-request">Information to Include in a Support Request</a>
+<a href="#privacy-requests">Privacy Requests</a></nav><article class="prose" aria-label="Support">
+<p class="policy-source">Source: <a href="https://github.com/Mosher23/Halthy/blob/main/SUPPORT.md">SUPPORT.md</a></p>
+<p>Help with the Halthy iPhone app and its Home Assistant companion integration.</p>
+<p>Last updated: 26 October 2026.</p>
+<section id="contact">
+<h2>Contact</h2>
+<ul>
+<li><strong>Email support:</strong> <a href="mailto:tsdeveloper@pm.me">tsdeveloper@pm.me</a></li>
+<li><strong>Report a bug or request a feature:</strong> <a href="https://github.com/Mosher23/Halthy/issues">GitHub Issues</a></li>
+<li><strong>Integration setup:</strong> <a href="https://github.com/Mosher23/Halthy/blob/main/custom_components/halthy/README.md">Home Assistant integration documentation</a></li>
+<li><strong>Privacy:</strong> <a href="https://github.com/Mosher23/Halthy/blob/main/PRIVACY.md">Halthy Privacy Policy</a></li>
+</ul>
+<p>Use email for private support, purchase questions, or privacy concerns. GitHub issues are public and require a GitHub account to submit. Email support does not require a GitHub account.</p>
+<p>Do not send passwords, access tokens, webhook URLs, private server addresses, or identifiable health and workout data. The developer does not need your Home Assistant or InfluxDB credentials to help troubleshoot.</p>
+</section>
+<section id="before-reporting-a-problem">
+<h2>Before Reporting a Problem</h2>
+<ol>
+<li>Check that Halthy and, if used, the Halthy Home Assistant integration are up to date. Restart Home Assistant after updating the integration.</li>
+<li>Open Halthy with the iPhone unlocked and check the selected metrics and Apple Health permissions under <strong>Settings &gt; Health access</strong>. Workouts and routes need their corresponding permissions and recorded data.</li>
+<li>If you use Home Assistant or InfluxDB, check network access and run <strong>Test connection</strong> in that destination&#39;s settings. Review the displayed result and any explanation.</li>
+<li>Try a manual upload and review <strong>Settings &gt; Logs</strong> for errors. Older app versions may call this section <strong>Log</strong> or <strong>Sync log</strong>.</li>
+</ol>
+<p>Home Assistant and InfluxDB are optional. The local dashboard, health charts, workout views, and file exports do not require either server.</p>
+</section>
+<section id="common-questions">
+<h2>Common Questions</h2>
+<details id="background-uploads-are-delayed"><summary>Background uploads are delayed</summary>
+<p>iOS controls when Halthy can run in the background. Enable background upload in Halthy and check the app&#39;s Background App Refresh permission in iPhone Settings. Low Power Mode, network availability, and system scheduling can delay work. Some HealthKit data is unavailable while the iPhone is locked.</p>
+<p>Background uploads are best effort, not a guarantee of continuous execution or uploads at a fixed interval. Open the app with the iPhone unlocked and use a manual upload when you need an immediate attempt. Historical imports may continue over multiple syncs.</p>
+</details><details id="home-assistant-does-not-connect-or-update"><summary>Home Assistant does not connect or update</summary>
+<p>Confirm that the Halthy integration is installed, Home Assistant has been restarted after installation or updates, and the configured HTTPS server address is reachable from the iPhone.</p>
+<p>For token-based setup, check that the token is valid and the app username matches the Halthy integration profile. For native sign-in or paired webhook delivery, review the saved connection and pairing in Halthy. Keep webhook URLs private. Follow any sign-in or recovery instructions shown by the app rather than repeatedly creating new pairings.</p>
+<p>Home Assistant entity states show current readings; they are not a complete raw sample history. Historical imports can require multiple upload passes. See the integration documentation for statistics and retention behavior.</p>
+</details><details id="influxdb-data-is-missing"><summary>InfluxDB data is missing</summary>
+<p>Check the HTTPS address, organization, bucket, measurement, and token permissions in <strong>Settings &gt; InfluxDB</strong>. Confirm that the desired health metrics and export options are selected. Run its connection test, then try a manual upload. A current snapshot and a historical sample import are different operations, so inspect the logs before assuming the full history has completed.</p>
+</details><details id="a-health-metric-sleep-value-or-workout-route-is-missing"><summary>A health metric, sleep value, or workout route is missing</summary>
+<p>Check that the corresponding record exists in Apple Health and that Halthy has permission to read it. Apple does not reveal individual read-permission decisions to apps, so review permissions in Apple Health if needed.</p>
+<p>Some sources deliver or revise measurements after the activity has finished. A later upload can therefore update sleep totals or other recorded values. Workout maps and GPX exports require an available workout route, not just a workout summary.</p>
+</details><details id="digital-health-is-unavailable"><summary>Digital Health is unavailable</summary>
+<p>Digital Health is optional and uses separate Screen Time data-access permission. It requires iOS 26.4 or later, a device in the EU, and an EU Apple Account. Availability is determined by Apple&#39;s authorization system; selecting an EU language or region in the app does not enable access.</p>
+</details><details id="trial-lifetime-access-or-restoring-a-purchase"><summary>Trial, Lifetime Access, or restoring a purchase</summary>
+<p>Halthy offers a seven-day trial that you start yourself and a one-time Lifetime Access purchase. It is not a subscription, and the trial does not automatically charge you.</p>
+<p>If you have already purchased Lifetime Access, use <strong>Restore Purchase</strong> with the Apple Account used for the purchase. Contact support if access is not restored. Never post payment details or receipts in a public issue.</p>
+</details></section>
+<section id="information-to-include-in-a-support-request">
+<h2>Information to Include in a Support Request</h2>
+<ul>
+<li>Halthy app version and build number.</li>
+<li>iPhone model and iOS version.</li>
+<li>Home Assistant integration version and Home Assistant version, or InfluxDB version, if relevant.</li>
+<li>Whether the problem happens with the app open, in the background, or both.</li>
+<li>The connection method used, if relevant: sign-in, access token, or paired webhook. Do not include the credential itself.</li>
+<li>Approximate time of the issue, including your time zone.</li>
+<li>Steps to reproduce it, what you expected, and what happened instead.</li>
+<li>The visible error message or a screenshot with personal information removed.</li>
+</ul>
+<h3 id="exporting-a-diagnostic-log">Exporting a Diagnostic Log</h3>
+<p>In recent versions, open <strong>Settings &gt; Logs</strong> and use the share/export button to generate a timestamped CSV debug log. Review the file before sharing it. Remove private information, health values, workout locations, credentials, and server details. Share only the minimum information needed to explain the problem.</p>
+<p>Do not attach health-data CSV/PDF exports or workout GPX files to a public issue. Those are different from a diagnostic log and may contain sensitive health or location data.</p>
+</section>
+<section id="privacy-requests">
+<h2>Privacy Requests</h2>
+<p>Halthy does not operate a health-data backend or Halthy user accounts. App data is stored on your device; data you export or sync is controlled by the destinations you choose. The developer cannot retrieve or delete records from your Apple Health store, Home Assistant instance, or InfluxDB instance.</p>
+<p>For privacy questions, email <a href="mailto:tsdeveloper@pm.me">tsdeveloper@pm.me</a> without including health records or credentials. See the <a href="https://github.com/Mosher23/Halthy/blob/main/PRIVACY.md">Privacy Policy</a> for data handling and deletion information.</p>
+<p>Halthy is not a medical device and does not provide medical advice, diagnosis, or treatment.</p>
+</section></article></div></main><footer class="site-footer"><div class="wrap footer-main"><a class="brand" href="./"><img src="assets/app-icon.png" width="32" height="32" alt="">Halthy</a><nav aria-label="Footer navigation"><a href="documentation.html">Documentation</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/Mosher23/Halthy">GitHub</a></nav><span>&copy; 2026 Sergii Tsiapenko</span></div><p class="wrap fine">Halthy is not a medical device and does not provide medical advice, diagnosis or treatment. GitHub hosts this static website; it has no scripts, forms or analytics and does not accept health data or credentials.</p></footer></body></html>

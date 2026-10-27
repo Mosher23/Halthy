@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halthy Privacy - Health, workouts and connected data</title>
+<meta name="description" content="The complete Halthy privacy policy, reproduced from the repository source."><meta name="theme-color" content="#151a22"><meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<link rel="canonical" href="https://mosher23.github.io/Halthy/privacy.html"><link rel="icon" href="assets/app-icon.png"><link rel="stylesheet" href="assets/site.css">
+</head><body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><nav class="wrap nav" aria-label="Main navigation">
+<a class="brand" href="./" aria-label="Halthy home"><img src="assets/app-icon.png" width="40" height="40" alt="">Halthy<span class="brand-note">FOR IPHONE</span></a>
+<div class="nav-links"><a href="./">Overview</a><a href="documentation.html">Guide</a><a href="support.html">Support</a><a class="nav-download" href="https://apps.apple.com/app/halthy/id6798250587">Get the app <span aria-hidden="true">&#8599;</span></a></div>
+</nav></header>
+<main id="main"><div class="wrap"><div class="page-heading"><p class="eyebrow">HALTHY / PRIVACY</p><h1>Your data. Your choice.</h1><p class="lead">The complete Halthy privacy policy, reproduced from the repository source.</p></div></div>
+<div class="wrap doc-layout"><nav class="doc-nav" aria-label="On this page"><strong>ON THIS PAGE</strong><a href="#summary">Summary</a>
+<a href="#data-halthy-can-access">Data Halthy Can Access</a>
+<a href="#how-data-is-used">How Data Is Used</a>
+<a href="#developer-data-collection">Developer Data Collection</a>
+<a href="#user-directed-destinations">User-Directed Destinations</a>
+<a href="#apple-services">Apple Services</a>
+<a href="#local-storage-and-security">Local Storage and Security</a>
+<a href="#retention-and-deletion">Retention and Deletion</a>
+<a href="#permissions-and-choices">Permissions and Choices</a>
+<a href="#children">Children</a>
+<a href="#changes-to-this-policy">Changes to This Policy</a>
+<a href="#contact-and-support">Contact and Support</a></nav><article class="prose" aria-label="Privacy">
+<p class="policy-source">Source: <a href="https://github.com/Mosher23/Halthy/blob/main/PRIVACY.md">PRIVACY.md</a></p><aside class="note"><p><strong>About this website:</strong> GitHub Pages hosts this static site. It has no forms, analytics, cookies set by Halthy or client-side scripts. GitHub handles hosting requests under its own <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">privacy statement</a>. The app policy below is reproduced without changing its source wording.</p></aside>
+<p>Last updated: August 30, 2026</p>
+<p>Halthy is an iPhone app that reads selected Apple Health data, displays health and workout information on the device, and can send selected data to services that the user configures, such as Home Assistant and InfluxDB.</p>
+<p>Halthy is not a medical device and does not provide medical advice, diagnosis, or treatment.</p>
+<section id="summary">
+<h2>Summary</h2>
+<ul>
+<li>Halthy does not operate a developer-controlled account system, analytics service, or health-data backend.</li>
+<li>The Halthy developer does not collect health, fitness, workout-route, usage, or diagnostic data through the app.</li>
+<li>Halthy does not sell personal information, use advertising identifiers, or track users across apps or websites.</li>
+<li>Health, workout, and route data stays on the device unless the user exports it or enables a destination that the user controls.</li>
+<li>Home Assistant and InfluxDB access tokens are stored in the iOS Keychain.</li>
+<li>The user controls Apple Health permissions and chooses which data types Halthy may read or write.</li>
+</ul>
+</section>
+<section id="data-halthy-can-access">
+<h2>Data Halthy Can Access</h2>
+<p>Depending on permissions and enabled features, Halthy can access:</p>
+<ul>
+<li>Selected HealthKit metrics, including activity, energy, distance, heart rate, blood oxygen, sleep, and related values.</li>
+<li>Workout details, including type, start and end times, duration, distance, active energy, speed, elevation, cadence, heart-rate samples, and available zone information.</li>
+<li>Workout-route locations, including latitude, longitude, altitude, timestamps, speed, and course when HealthKit provides them.</li>
+<li>A representative workout-route location and workout time used to request historical conditions from Apple Weather when weather enrichment is available.</li>
+<li>Home Assistant sensor values selected in an import mapping.</li>
+<li>Camera frames while the user is actively scanning a QR code used to fill destination configuration.</li>
+<li>Add-only access to the Photos library when the user chooses <strong>Save to Photos</strong> for a workout-card image. Halthy does not read the user&#39;s photo library.</li>
+<li>App Store transaction information made available by StoreKit to verify the lifetime-access purchase on the device.</li>
+</ul>
+<p>The camera image is processed for QR recognition and is not uploaded to the Halthy developer.</p>
+</section>
+<section id="how-data-is-used">
+<h2>How Data Is Used</h2>
+<p>Halthy uses data only to provide features selected by the user:</p>
+<ul>
+<li>Displaying local health statistics, charts, summaries, workouts, maps, and route replays.</li>
+<li>Enriching workout displays and generated route images with available workout-time conditions from Apple Weather.</li>
+<li>Creating a workout replay video for the user to review or share.</li>
+<li>Creating a workout-card image for sharing or optional saving to Photos.</li>
+<li>Generating PDF, CSV, and optional GPX exports for the user to share through the iOS share sheet.</li>
+<li>Sending selected data to the user&#39;s Home Assistant instance.</li>
+<li>Sending selected raw data to the user&#39;s InfluxDB instance when enabled.</li>
+<li>Reading selected Home Assistant sensor values and writing mapped values to Apple Health after write permission is granted.</li>
+<li>Generating workout route images and uploading them to Home Assistant when enabled.</li>
+<li>Creating local notifications for enabled events, such as repeated synchronization failures or workout uploads.</li>
+<li>Creating optional local trend notifications based on changes from a recent on-device baseline.</li>
+<li>Determining the local trial period and StoreKit-verified lifetime-access status.</li>
+</ul>
+</section>
+<section id="developer-data-collection">
+<h2>Developer Data Collection</h2>
+<p>Halthy has no developer-operated server and does not include third-party analytics, advertising, tracking, or crash-reporting SDKs. The developer cannot access data sent to a Home Assistant or InfluxDB instance configured by the user.</p>
+<p>For this reason, the app&#39;s current architecture does not collect data as Apple defines that term for App Store privacy disclosures: data is not transmitted in a way that allows the Halthy developer or an integrated third-party partner to access it beyond servicing a request.</p>
+<p>If this architecture changes, this policy and the App Store privacy disclosures will be updated before the changed version is released.</p>
+</section>
+<section id="user-directed-destinations">
+<h2>User-Directed Destinations</h2>
+<h3 id="home-assistant">Home Assistant</h3>
+<p>When enabled, Halthy sends selected health, workout, route, and synchronization data directly to the Home Assistant URL configured by the user, using the user&#39;s long-lived access token. Data retention and deletion in Home Assistant are controlled by the user and the user&#39;s Home Assistant configuration.</p>
+<h3 id="influxdb">InfluxDB</h3>
+<p>When enabled, Halthy sends selected raw HealthKit and optional workout-route data directly to the InfluxDB URL, organization, bucket, and measurement configured by the user. Data retention and deletion in InfluxDB are controlled by the user and the user&#39;s InfluxDB configuration.</p>
+<h3 id="apple-health">Apple Health</h3>
+<p>When the user enables an import mapping and grants write permission, Halthy can write a mapped Home Assistant value to the selected Apple Health data type. Apple Health data can be reviewed and deleted in the Health app.</p>
+<h3 id="user-exports">User Exports</h3>
+<p>Halthy can create local PDF, CSV, and GPX files containing selected health, workout, and precise route-location data. These files are shared only after the user starts an export and selects a destination in the iOS share sheet. The selected destination&#39;s privacy practices apply after the file is shared.</p>
+<p>Halthy can also create a local workout replay video. The video is shared only after the user chooses a destination in the iOS share sheet.</p>
+<p>Halthy can create a workout-card image containing workout details and a route map. The image is shared only after the user chooses a destination in the iOS share sheet, or saved to the Photos library only after the user selects <strong>Save to Photos</strong> and grants add-only Photos access.</p>
+</section>
+<section id="apple-services">
+<h2>Apple Services</h2>
+<p>Halthy uses Apple system services including HealthKit, MapKit, WeatherKit, StoreKit, BackgroundTasks, Photos, notifications, and the iOS share sheet. When weather enrichment is available, WeatherKit receives a representative workout-route location and workout time to return historical conditions. On supported devices, Halthy can use Apple&#39;s Foundation Models framework to create summaries on the device. Halthy does not send the summary context to a Halthy-operated model or cloud service.</p>
+<p>Apple may process information under Apple&#39;s own terms and privacy policy when its services are used. The Halthy developer does not receive that information through a Halthy backend.</p>
+</section>
+<section id="local-storage-and-security">
+<h2>Local Storage and Security</h2>
+<p>Halthy stores app configuration and operational data in the app&#39;s local container, including:</p>
+<ul>
+<li>Destination URLs, usernames, selected metrics, import mappings, and preferences.</li>
+<li>HealthKit synchronization cursors, upload status, and pending upload queues.</li>
+<li>Cached health summaries, workouts, route data, workout weather, generated route images, replay videos, and export files while needed for app functionality or sharing.</li>
+<li>Local notification and troubleshooting information.</li>
+</ul>
+<p>Home Assistant and InfluxDB access tokens and the local trial-start record are stored in the iOS Keychain using device-only protection. Network transfers to configured destinations require HTTPS.</p>
+</section>
+<section id="retention-and-deletion">
+<h2>Retention and Deletion</h2>
+<p>Local cache and queue data is retained only as needed for configured app features and may be replaced or pruned as new data is processed. Export files are created in temporary local storage for sharing and are subject to iOS cleanup after use.</p>
+<p>The user can:</p>
+<ul>
+<li>Revoke Halthy&#39;s HealthKit access in the Health app or iOS Settings.</li>
+<li>Disable Home Assistant, InfluxDB, background synchronization, notifications, route uploads, or import mappings in Halthy.</li>
+<li>Clear destination token fields before deleting the app.</li>
+<li>Delete the app to remove its local app container.</li>
+<li>Delete data previously sent to Home Assistant or InfluxDB in those systems.</li>
+<li>Review and delete data written to Apple Health in the Health app.</li>
+</ul>
+<p>iOS Keychain items can persist after an app is deleted. Clearing the Home Assistant and InfluxDB token fields before deleting Halthy replaces the stored credentials with empty values. A local trial-start record may remain in Keychain to prevent a reinstall from restarting an expired trial.</p>
+<p>Because Halthy has no developer backend or app accounts, the developer has no server-side health profile to retrieve or delete.</p>
+</section>
+<section id="permissions-and-choices">
+<h2>Permissions and Choices</h2>
+<p>HealthKit read and write permissions are controlled by the user. Halthy requests access only for enabled functionality. The user can grant, deny, or later revoke individual data-type permissions through Apple Health and iOS privacy settings.</p>
+<p>Camera, Photos, and notification permissions are optional. Denying them disables only the related QR-scanning, Save to Photos, or notification feature. Halthy requests add-only Photos access and does not request permission to read the photo library.</p>
+</section>
+<section id="children">
+<h2>Children</h2>
+<p>Halthy is not directed to children under 13. The app does not knowingly collect children&#39;s personal information through a developer-operated service.</p>
+</section>
+<section id="changes-to-this-policy">
+<h2>Changes to This Policy</h2>
+<p>This policy may be updated when Halthy&#39;s features or data handling change. The date at the top identifies the latest revision. Material changes will be reflected in the app and App Store privacy disclosures as appropriate.</p>
+</section>
+<section id="contact-and-support">
+<h2>Contact and Support</h2>
+<p>For support or privacy-policy questions, use the project issue tracker:</p>
+<p>https://github.com/Mosher23/Halthy/issues</p>
+<p>Do not include health data, workout routes, access tokens, private server addresses, or other sensitive information in a public issue.</p>
+</section></article></div></main><footer class="site-footer"><div class="wrap footer-main"><a class="brand" href="./"><img src="assets/app-icon.png" width="32" height="32" alt="">Halthy</a><nav aria-label="Footer navigation"><a href="documentation.html">Documentation</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/Mosher23/Halthy">GitHub</a></nav><span>&copy; 2026 Sergii Tsiapenko</span></div><p class="wrap fine">Halthy is not a medical device and does not provide medical advice, diagnosis or treatment. GitHub hosts this static website; it has no scripts, forms or analytics and does not accept health data or credentials.</p></footer></body></html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Halthy Guide - Health, workouts and connected data</title>
+<meta name="description" content="From your first dashboard to your own connected setup. Clear steps, useful details, no guesswork."><meta name="theme-color" content="#151a22"><meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<link rel="canonical" href="https://mosher23.github.io/Halthy/documentation.html"><link rel="icon" href="assets/app-icon.png"><link rel="stylesheet" href="assets/site.css">
+</head><body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><nav class="wrap nav" aria-label="Main navigation">
+<a class="brand" href="./" aria-label="Halthy home"><img src="assets/app-icon.png" width="40" height="40" alt="">Halthy<span class="brand-note">FOR IPHONE</span></a>
+<div class="nav-links"><a href="./">Overview</a><a href="documentation.html" aria-current="page">Guide</a><a href="support.html">Support</a><a class="nav-download" href="https://apps.apple.com/app/halthy/id6798250587">Get the app <span aria-hidden="true">&#8599;</span></a></div>
+</nav></header>
+<main id="main"><div class="wrap"><div class="page-heading"><p class="eyebrow">HALTHY / GUIDE</p><h1>The Halthy guide.</h1><p class="lead">From your first dashboard to your own connected setup. Clear steps, useful details, no guesswork.</p></div></div>
+<div class="wrap doc-layout"><nav class="doc-nav" aria-label="On this page"><strong>ON THIS PAGE</strong><a href="#get-started">Get started</a>
+<a href="#workouts-and-replay">Workouts and replay</a>
+<a href="#exports">Exports</a>
+<a href="#home-assistant">Home Assistant</a>
+<a href="#influxdb">InfluxDB</a>
+<a href="#digital-health">Digital Health</a>
+<a href="#background-uploads">Background uploads</a>
+<a href="#daily-resets-and-history">Daily resets and history</a>
+<a href="#troubleshooting-and-logs">Troubleshooting and logs</a></nav><article class="prose" aria-label="Guide">
+<p class="policy-source">Source: <a href="https://github.com/Mosher23/Halthy/blob/main/docs/guide.md">docs/guide.md</a></p>
+<p>Everything you need to explore your health, revisit a workout and connect your own services. The screenshots show the Halthy 1.1 design; controls can differ in older app versions.</p>
+<section id="get-started">
+<h2>Get started</h2>
+<p>Halthy works with the health and workout data already recorded in Apple Health. It is not a workout recorder, medical device or diagnostic tool.</p>
+<ol>
+<li>Install <a href="https://apps.apple.com/app/halthy/id6798250587">Halthy from the App Store</a> on an iPhone running iOS 18.5 or later.</li>
+<li>Follow setup, choose your health metrics and grant the corresponding Apple Health read permissions. Workout details and workout routes require their own permissions.</li>
+<li>Choose the metrics displayed on your dashboard. Open a metric to explore its available charts and summaries.</li>
+<li>Add Home Assistant or InfluxDB only if you want to use them. Neither is needed for the local dashboard, workout views or file exports.</li>
+</ol>
+<p>Apple Health does not reveal individual read-permission decisions to apps. If a value is missing, first check that it exists in Apple Health and that Halthy has access to it. An empty result does not necessarily mean a zero measurement.</p>
+<p>Halthy offers a seven-day trial that you start yourself, followed by an optional one-time Lifetime Access purchase. It is not a subscription and the trial does not automatically charge you. Restore purchases using the same Apple Account used for the original purchase.</p>
+</section>
+<section id="workouts-and-replay">
+<h2>Workouts and replay</h2>
+<p>Browse the workout calendar to find a recorded session. Available details can include distance, duration, pace, energy, heart rate and elevation. A workout without route data can still have useful measurements.</p>
+<p>With workout-route permission and recorded route data, you can explore maps, use satellite views, replay the route and create workout images or replay videos to share. Available Apple Weather context depends on route location, workout time and network access.</p>
+<p>Read the sharing preview before sending a workout image, route or video: it can reveal precise locations. Halthy does not share these files automatically.</p>
+<p>Sleep charts use recorded sleep stages when available, with durations and percentages. Sources can deliver or revise sleep records after you wake up, so later readings may change. Recorded sleep boundaries are not live sleep detection.</p>
+</section>
+<section id="exports">
+<h2>Exports</h2>
+<p>Open <strong>Settings &gt; Export</strong> in updated app versions. Choose the data and a preset or custom date range, then generate a file locally and select a destination in the iPhone share menu.</p>
+<ul>
+<li><strong>CSV:</strong> selected health data for spreadsheets and your own analysis.</li>
+<li><strong>PDF:</strong> readable health reports, with optional graphs.</li>
+<li><strong>GPX:</strong> recorded workout routes. Include workouts and routes in the export options; a workout summary alone is not enough.</li>
+</ul>
+<p>File export is separate from automatic synchronization. A file goes only to the destination you choose in the system share menu. Exported health values and locations can be sensitive; do not attach them to a public support issue.</p>
+</section>
+<section id="home-assistant">
+<h2>Home Assistant</h2>
+<h3 id="install-the-companion-integration">Install the companion integration</h3>
+<ol>
+<li>Open <strong>HACS &gt; Integrations</strong> in your Home Assistant instance.</li>
+<li>If needed, add <code>https://github.com/Mosher23/Halthy</code> as a custom repository with category <strong>Integration</strong>.</li>
+<li>Install Halthy and <strong>restart Home Assistant</strong>.</li>
+<li>Open <strong>Settings &gt; Devices &amp; services &gt; Add integration</strong>, search for <strong>Halthy</strong>, and create a profile for each person.</li>
+<li>Choose a username and, optionally, a display name. For manual-token setups, the app username must match the integration profile.</li>
+</ol>
+<p>For a manual installation, copy only <code>custom_components/halthy</code> from the <a href="https://github.com/Mosher23/Halthy">integration repository</a> into your Home Assistant configuration&#39;s <code>custom_components</code> directory, then restart and add the integration.</p>
+<h3 id="connect-the-iphone-app">Connect the iPhone app</h3>
+<p>In <strong>Settings &gt; Home Assistant</strong>, use the connection setup to choose Home Assistant sign-in or an access token. Native sign-in takes place on your own Home Assistant server, not this website. Use a compatible updated app and integration for native sign-in and device pairing.</p>
+<ul>
+<li><strong>Home Assistant sign-in:</strong> sign in on your server and select or create an eligible profile. Supported setups can pair a per-device webhook for uploads.</li>
+<li><strong>Access token:</strong> configure a valid long-lived access token, your HTTPS server URL and the matching profile username.</li>
+<li><strong>Upload method:</strong> choose paired Webhook delivery or Authenticated API as supported by the saved connection. A webhook is not a replacement for authentication for pairing, revocation or commands.</li>
+</ul>
+<p>Keep access tokens and webhook URLs private. This website does not ask for, accept or relay credentials. The app&#39;s approved sign-in return address is <code>halthy-ha://auth/callback</code>.</p>
+<h3 id="verify-and-upload">Verify and upload</h3>
+<p>Use <strong>Test connection</strong> and read its displayed success, warning or failure explanation. Connection checks and successful upload acknowledgments are separate checks. Select your metrics and try a foreground upload with the iPhone unlocked.</p>
+<p>For an ownerless profile created through the config-flow API, an administrator may need to run <code>halthy.assign_profile_owner</code> before it appears during sign-in. This action cannot transfer an already-owned profile. See <a href="https://github.com/Mosher23/Halthy/blob/main/docs/troubleshooting.md">advanced troubleshooting</a>.</p>
+<h3 id="add-the-workout-card">Add the workout card</h3>
+<p>The companion integration bundles <code>custom:halthy-workout-card</code> and normally registers it automatically. Add it to a dashboard; replace <code>your_username</code> with the configured Halthy username.</p>
+<pre><code>type: custom:halthy-workout-card
+user: your_username
+show_heart_rate_zones: true</code></pre>
+<p>Each person also gets a read-only <code>calendar.&lt;username&gt;_workouts</code> entity. Workout metadata and archived images have per-person retention limits. Maps, zone details and calendar history depend on what the app has uploaded.</p>
+<p><a href="https://github.com/Mosher23/Halthy/blob/main/custom_components/halthy/README.md">Full integration reference</a> covers entity IDs, configuration, archive storage, services and authentication.</p>
+</section>
+<section id="influxdb">
+<h2>InfluxDB</h2>
+<p>Open <strong>Settings &gt; InfluxDB</strong> and configure your HTTPS address, organization, bucket, measurement and a token with the required permissions. Select the metrics and export options you want, run the connection test and try an upload.</p>
+<p>A current snapshot is different from the full recorded sample history. Halthy can export supported raw HealthKit samples, including available heart-rate history, in bounded batches. Large imports may continue over multiple runs. The app cannot export samples it cannot read from Apple Health.</p>
+<p>Check <strong>Settings &gt; Logs</strong> for InfluxDB acknowledgments and history progress. InfluxDB retention and deletion are controlled by your bucket configuration, not by Halthy. Never put its token in a public issue.</p>
+</section>
+<section id="digital-health">
+<h2>Digital Health</h2>
+<p>Digital Health is optional and uses separate Screen Time data-access permission, not HealthKit permission. It requires <strong>iOS 26.4 or later, an eligible device in the EU and an EU Apple Account</strong>. Apple&#39;s authorization system determines eligibility.</p>
+<p>Open <strong>Settings &gt; Digital health</strong> to configure supported readings. Available device-level aggregates include screen time, longest activity session, first pickup time and pickups without app use. App identities and website browsing history are not sent as part of these aggregates.</p>
+<p>Updated compatible versions can upload selected readings to Home Assistant, including paired webhook delivery, and export supported Digital Health history to InfluxDB. Changing the app language or region alone does not enable eligibility.</p>
+</section>
+<section id="background-uploads">
+<h2>Background uploads</h2>
+<p>Enable background upload for the relevant destination in Halthy and review Background App Refresh in iPhone Settings. iOS decides when the app may run: <strong>background uploads do not guarantee a fixed interval or continuous execution</strong>.</p>
+<p>Low Power Mode, network access, scheduling and unavailable protected HealthKit data can delay work. Opening the app with the iPhone unlocked gives pending work another opportunity to continue. Use a foreground manual upload for an immediate attempt.</p>
+<p>Current readings, historical imports, workout images and commands are distinct work. An upload can succeed while history is still importing. If the app reports an issue, inspect the named operation in Logs rather than assuming every destination failed.</p>
+</section>
+<section id="daily-resets-and-history">
+<h2>Daily resets and history</h2>
+<p>The integration resets daily counters independently of phone uploads at <strong>00:00 in the reporting timezone</strong>. It also catches up after a restart or reload. Updated snapshots supply the reporting timezone; older payloads fall back to Home Assistant&#39;s timezone. Calendar-day boundaries follow daylight saving changes.</p>
+<ul>
+<li>Daily activity, steps, distance, energy, dietary totals, event counts and workout totals reset to <strong>0</strong>.</li>
+<li>Daily Digital Health screen time, longest activity session and pickups without app use reset to <strong>0</strong>.</li>
+<li>First pickup time becomes <strong>unknown</strong> until a pickup is reported for the new day.</li>
+<li>Sleep-session results, latest medical readings and last-workout timestamps retain their last result. They are not daily counters.</li>
+<li>Daily uploads uses Home Assistant&#39;s timezone. A midnight reset is not counted as a new upload or a new full sync.</li>
+</ul>
+<p>Previous-day retries and historical daily snapshots cannot replace today&#39;s live total. Updating the integration does not rewrite old graph history or move a previously recorded morning reset back to midnight. The corrected behavior applies to future history.</p>
+<p>Live entity states are current readings. Home Assistant&#39;s imported <code>halthy:*</code> long-term statistics are hourly summaries, not a raw sample archive. For full supported sample history, use InfluxDB. See the <a href="https://github.com/Mosher23/Halthy/blob/main/custom_components/halthy/README.md#midnight-rollover">rollover reference</a> for freshness attributes and edge cases.</p>
+</section>
+<section id="troubleshooting-and-logs">
+<h2>Troubleshooting and logs</h2>
+<p>Open <strong>Settings &gt; Logs</strong>. Use the filters to focus on issues, Home Assistant, InfluxDB or Digital Health. Expand <strong>Details</strong> for the specific operation. Share exports a timestamped CSV diagnostic log through the system share menu.</p>
+<p>Review diagnostic files before sharing. Remove private server addresses, credentials, health values and route locations. A diagnostic log is different from a health-data export.</p>
+<ul>
+<li><strong>Missing readings:</strong> check Apple Health records, permissions and metric selection.</li>
+<li><strong>Connection warning:</strong> read the test result, confirm server reachability and the saved connection method, then retry.</li>
+<li><strong>Old daily graph:</strong> previous history is retained; verify a new midnight rollover after updating and restarting the integration.</li>
+<li><strong>Sleep total changes:</strong> a source may have delivered late records or revised the session. Compare the underlying records in Apple Health.</li>
+<li><strong>Missing history:</strong> check logs and selected import range. Current readings being accepted does not mean every historical batch is complete.</li>
+<li><strong>Workout preparation fails:</strong> review the named workout and preparation stage in Details. Retry or recovery actions depend on the failure; don&#39;t repeatedly create new pairings.</li>
+</ul>
+<p>Visit <a href="support.html">Support</a> for common questions and contact details, or the <a href="https://github.com/Mosher23/Halthy/blob/main/docs/troubleshooting.md">advanced integration troubleshooting reference</a> for administrator actions. Do not send health data or credentials to this website.</p>
+</section></article></div></main><footer class="site-footer"><div class="wrap footer-main"><a class="brand" href="./"><img src="assets/app-icon.png" width="32" height="32" alt="">Halthy</a><nav aria-label="Footer navigation"><a href="documentation.html">Documentation</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/Mosher23/Halthy">GitHub</a></nav><span>&copy; 2026 Sergii Tsiapenko</span></div><p class="wrap fine">Halthy is not a medical device and does not provide medical advice, diagnosis or treatment. GitHub hosts this static website; it has no scripts, forms or analytics and does not accept health data or credentials.</p></footer></body></html>

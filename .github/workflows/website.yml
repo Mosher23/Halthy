@@ -1,0 +1,33 @@
+name: Website validation
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'SUPPORT.md'
+      - 'PRIVACY.md'
+      - '.github/scripts/build_site_documents.rb'
+      - '.github/scripts/check_site.py'
+      - '.github/workflows/website.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'SUPPORT.md'
+      - 'PRIVACY.md'
+      - '.github/scripts/build_site_documents.rb'
+      - '.github/scripts/check_site.py'
+      - '.github/workflows/website.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check generated documents match their sources
+        run: ruby .github/scripts/build_site_documents.rb --check
+      - name: Validate site and Home Assistant sign-in contract
+        run: python3 .github/scripts/check_site.py

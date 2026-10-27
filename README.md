@@ -6,13 +6,20 @@ Home Assistant custom integration for the Halthy app.
 Halthy is a peer-to-peer bridge between iPhone HealthKit data and Home Assistant.
 The app talks directly to your Home Assistant instance. There is no external Halthy cloud relay for metric processing.
 
-> [!NOTE]
-> **Halthy for iPhone is available in beta.**
->
-> [Join the TestFlight](https://testflight.apple.com/join/8KWJZZj2) beta to test the app on an iPhone running iOS 18.5 or later. Beta builds may contain bugs and expire after 90 days. Please send feedback through TestFlight or [GitHub Issues](https://github.com/Mosher23/Halthy/issues).
+**[Explore Halthy](https://mosher23.github.io/Halthy/)** -
+[Get the iPhone app](https://apps.apple.com/app/halthy/id6798250587) -
+[Read the setup guide](https://mosher23.github.io/Halthy/documentation.html)
+
+Requires iOS 18.5 or later. For pre-release builds, the optional
+[TestFlight beta](https://testflight.apple.com/join/8KWJZZj2) remains separate from
+the App Store release.
 
 ## Documentation, Privacy, and Support
 
+- Website and app overview: [mosher23.github.io/Halthy](https://mosher23.github.io/Halthy/)
+- Readable setup and usage guide: [Documentation](https://mosher23.github.io/Halthy/documentation.html)
+- Website support and contact: [Support](https://mosher23.github.io/Halthy/support.html)
+- Website privacy policy: [Privacy](https://mosher23.github.io/Halthy/privacy.html)
 - Home Assistant integration documentation: [`custom_components/halthy/README.md`](custom_components/halthy/README.md)
 - Privacy policy: [`PRIVACY.md`](PRIVACY.md)
 - Security policy: [`SECURITY.md`](SECURITY.md)
