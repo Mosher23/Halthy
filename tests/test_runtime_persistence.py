@@ -134,3 +134,19 @@ class RuntimePersistenceTests(unittest.IsolatedAsyncioTestCase):
         description = workout_calendar_event(restored).description
         for text in ("Matrix Indoor Bike", "Machine duration:", "60 rpm", "197", "12", "100 W", "120 bpm"):
             self.assertIn(text, description)
+
+    async def test_startup_resolves_stored_reporting_zones_before_publishing_daily_state(self):
+        from datetime import datetime, timezone
+        old = bridge.HalthySensorState(unique_id="synthetic-steps", metric_key="steps", name="Steps", state=9000,
+            unit="count", icon=None, username="tester", device_id="synthetic",
+            attributes={"reporting_time_zone": "America/Chicago", "daily_reporting_date": "2020-01-01"},
+            updated_at=datetime(2020, 1, 1, tzinfo=timezone.utc))
+        self.runtime.sensors[old.unique_id] = old
+        with self.setup_patches():
+            await bridge.async_unload_entry(self.hass, self.entry)
+            with patch.object(bridge.dt_util, "async_get_time_zone", wraps=bridge.dt_util.async_get_time_zone) as resolve:
+                await bridge.async_setup_entry(self.hass, self.entry)
+        self.assertIn(unittest.mock.call("America/Chicago"), resolve.await_args_list)
+        restored = self.hass.data[bridge.DOMAIN]["entries"]["entry"].sensors[old.unique_id]
+        self.assertEqual(restored.state, 0)
+        self.assertEqual(restored.attributes["reporting_time_zone"], "America/Chicago")

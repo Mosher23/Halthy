@@ -7,6 +7,21 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-28
+
+### Fixed
+
+- Resolve dynamic reporting time zones with Home Assistant's async time-zone API before upload validation, daily rollover, or startup recovery. Calculation helpers receive resolved zones and never load the time-zone database on the event loop. Preserve fixed-offset identifiers, invalid-payload rejection, and daylight-saving rollover behaviour.
+- Preserve user-customized sensor and image entity IDs across uploads, reloads, and username changes. Remove automatic entity-ID rewriting; username-prefixed IDs are suggested only when Home Assistant creates a new entity. Existing IDs remain unchanged.
+
+### Tests
+
+- Add real Home Assistant registry regressions for sensor and image renames, executor-thread coverage for uncached time zones, and upload, timer and startup recovery checks.
+
+### Compatibility
+
+- Addresses both changes requested in the HACS inclusion review. Update through HACS and restart Home Assistant; no iOS app update is required.
+
 ## [0.2.5] - 2026-10-27
 
 ### Fixed

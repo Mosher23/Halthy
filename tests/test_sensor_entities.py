@@ -33,7 +33,7 @@ class SensorEntityTests(unittest.TestCase):
             entity, original = self.make_sensor(key, state, unit)
             record = replace(original, updated_at=before, attributes={"measurement_timestamp": before.isoformat()})
             sensors = {record.unique_id: record}
-            daily.rollover_daily_sensors(sensors, now, "UTC")
+            daily.rollover_daily_sensors(sensors, now, timezone.utc, {})
             entity._apply_state(sensors[record.unique_id])
             self.assertEqual(entity.native_value, None if key == "first_pickup_time" else 0)
             self.assertEqual(entity.unique_id, record.unique_id)
