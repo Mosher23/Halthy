@@ -223,7 +223,7 @@ You can change the configured **Username** and **Display Name** for an existing 
 - The username is the routing key used by `/api/halthy/push`, command polling, services, and the workout archive.
 - After changing it in Home Assistant, update the username in the iOS app to match.
 - On reload, Halthy moves archived workout files to the new username folder and updates stored archive references.
-- Sensor and image entity IDs are migrated when the target ID is available. Configuration controls retain stable internal IDs across username changes.
+- Existing sensor and image entity IDs, including custom IDs chosen in Home Assistant, are preserved across uploads, reloads, and username changes. New entities receive username-prefixed ID suggestions. Configuration controls retain stable internal IDs.
 - Home Assistant recorder statistic IDs contain the username. Changing it starts new `halthy:*` statistic series; existing historical series remain in the recorder.
 
 ### 📊 Historical Statistics
