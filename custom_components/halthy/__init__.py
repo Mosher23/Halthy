@@ -3442,9 +3442,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _ensure_http_views_registered(hass, domain_data)
 
-    # Restore a missed calendar rollover before entity platforms publish state.
-    if await _async_reset_daily_health_sensors(hass, runtime, entry.entry_id):
-        _schedule_store_save(hass)
+    # Serialize startup recovery with uploads while time zones load asynchronously.
+    async with _runtime_lock(runtime):
+        if await _async_reset_daily_health_sensors(hass, runtime, entry.entry_id):
+            _schedule_store_save(hass)
     _upsert_daily_upload_count_sensor(
         hass=hass,
         runtime=runtime,
