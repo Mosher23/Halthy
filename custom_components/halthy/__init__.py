@@ -3109,6 +3109,10 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     await _async_ensure_webhook_manager(hass, hass.data[DOMAIN])
     await _async_register_workout_card_module(hass)
 
+    from .counter_unit_migration import async_register_migration_service
+
+    await async_register_migration_service(hass)
+
     if not hass.services.has_service(DOMAIN, "assign_profile_owner"):
         from homeassistant.helpers.service import async_register_admin_service
 
@@ -3551,6 +3555,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry_on_update))
 
+    if "recorder" in getattr(hass.config, "components", set()):
+        from .counter_unit_migration import async_migrate_counter_statistics_on_setup
+
+        await async_migrate_counter_statistics_on_setup(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _schedule_store_save(hass)
     return True

@@ -7,6 +7,18 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-29
+
+### Fixed
+
+- Automatically migrate legacy `count`/`counts` statistics metadata for unitless Halthy counters after Home Assistant starts and on integration reload. Preserves short-term and long-term values, timestamps and entity IDs. Resolves the unit-change repairs introduced by v0.2.7 without deleting statistics.
+- Add the administrator-only `halthy.migrate_counter_statistics` action with an optional profile selector and preview mode. Verify Recorder writes before clearing matching repairs; leave unrelated sensors, units and repair issues untouched. Safe to retry after a recorder outage.
+
+### Upgrade
+
+- Update the integration and restart Home Assistant, or reload Halthy after the updated code is loaded. The counter-unit migration runs automatically. No iOS app update is required for this repair.
+- Do not delete historical statistics or recreate affected entities. For a manual preview or retry, run **Halthy: Migrate counter statistics** from **Tools > Actions**. See the [migration instructions](docs/troubleshooting.md#unit-change-repairs-after-v027).
+
 ## [0.2.7] - 2026-10-29
 
 ### Fixed

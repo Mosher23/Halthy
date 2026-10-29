@@ -314,6 +314,7 @@ These are external Home Assistant long-term statistics, so `halthy:*` statistic 
 
 ## Troubleshooting
 
+- **Unit-change repairs after v0.2.7**: the updated integration automatically migrates counter-unit metadata while preserving history and entity IDs. Administrators can preview or retry with `halthy.migrate_counter_statistics`. See [migration instructions](https://github.com/Mosher23/Halthy/blob/main/docs/troubleshooting.md#unit-change-repairs-after-v027).
 - **Config flow does not open**: restart Home Assistant and check integration logs for config flow errors.
 - **`401` / `403` on upload**: verify long-lived token and user ownership for configured username.
 - **Entities not updating**: verify the app username exactly matches **Username** in the integration entry.

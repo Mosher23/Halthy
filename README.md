@@ -422,6 +422,7 @@ Use this when you want:
 
 ## 🛠️ Troubleshooting
 
+- **Unit-change repairs after v0.2.7**: the updated integration migrates legacy counter-unit metadata automatically without deleting history. Administrators can preview or retry with `halthy.migrate_counter_statistics`. See [migration instructions](docs/troubleshooting.md#unit-change-repairs-after-v027).
 - **`401` or `403`**: token missing, expired, or wrong user ownership for target username.
 - **Push works but history looks sparse**: Home Assistant external statistics are hourly; use InfluxDB for raw high-resolution history.
 - **Import mapping fails**: verify sensor exists, mapping units are correct, and HealthKit write permission is granted.

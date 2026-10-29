@@ -108,6 +108,21 @@ class RuntimePersistenceTests(unittest.IsolatedAsyncioTestCase):
             await self.assign(self.admin, self.other)
         self.assertEqual(self.runtime.owner_user_id, self.user.id)
 
+    async def test_counter_migration_action_is_admin_only_and_returns_preview(self):
+        from custom_components.halthy import counter_unit_migration
+
+        result = {"status": "preview", "dry_run": True, "statistic_ids": ["sensor.my_custom_counter"]}
+        with patch.object(counter_unit_migration, "async_migrate_counter_statistics", new=AsyncMock(return_value=result)) as migrate:
+            with self.assertRaises(Unauthorized):
+                await self.hass.services.async_call("halthy", "migrate_counter_statistics",
+                    {"dry_run": True}, blocking=True, context=Context(user_id=self.user.id), return_response=True)
+            migrate.assert_not_awaited()
+            response = await self.hass.services.async_call("halthy", "migrate_counter_statistics",
+                {"entry_id": "entry", "dry_run": True}, blocking=True,
+                context=Context(user_id=self.admin.id), return_response=True)
+            self.assertEqual(response, result)
+            migrate.assert_awaited_once_with(self.hass, "entry", dry_run=True)
+
     async def test_disabled_owner_and_storage_failure_do_not_change_ownership(self):
         await self.hass.auth.async_update_user(self.user, is_active=False)
         with self.assertRaises(ServiceValidationError):

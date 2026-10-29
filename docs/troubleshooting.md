@@ -1,5 +1,39 @@
 # Troubleshooting
 
+## Unit-change repairs after v0.2.7
+
+Version 0.2.7 removed the literal `count` unit from counters without migrating
+their existing Recorder statistics metadata. Home Assistant treats `count` and
+no unit as incompatible, so it creates a repair for each affected sensor and can
+pause statistics for those sensors. This is a unit-label mismatch, not evidence
+that your historical numbers are wrong.
+
+The updated integration automatically repairs this metadata after Home Assistant
+finishes starting, or when the integration is reloaded while HA is running.
+It changes only `count`/`counts` to no unit for counters belonging to Halthy.
+Short-term and long-term values, timestamps, entity IDs and user-selected names
+remain unchanged. Separate `halthy:` statistics are checked too. Confirmed stale
+unit-change repairs are removed; unrelated repairs, such as expired Xiaomi
+authentication, are not touched. Take a normal Home Assistant backup before an
+integration upgrade.
+
+To preview or retry manually as an administrator:
+
+1. Open **Tools → Actions** (**Developer Tools → Actions** on older versions).
+2. Select **Halthy: Migrate counter statistics** (`halthy.migrate_counter_statistics`).
+3. Optionally select a Halthy integration entry. Leave it empty to check all loaded profiles.
+4. Enable **Preview only** and request an action response to list affected statistic IDs without changing anything.
+5. Turn **Preview only** off and run the action to repair them. Repeating it is safe.
+
+The response lists the migrated IDs or reports `no_changes`. A Recorder timeout
+or failed write is not reported as a successful migration; retry once Recorder
+is available. The tool does not rewrite raw state history or reconstruct
+statistics that Home Assistant never compiled while the mismatch was active.
+
+If fixing a repair manually, choose **Update the unit of the historic statistic
+values … without converting**, not **Delete all old statistic data**. There is
+no need to remove and recreate the integration or its sensors.
+
 ## App cannot find an existing profile after API setup
 
 An entry created through Home Assistant's config-flow API may have no owner.
