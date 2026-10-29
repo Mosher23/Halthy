@@ -67,7 +67,8 @@ class EntityRenameTests(unittest.IsolatedAsyncioTestCase):
         if domain == "sensor":
             self.assertEqual(self.hass.states.get(renamed).state, "84")
         else:
-            self.assertEqual(self.hass.states.get(renamed).state, "Walking")
+            self.assertEqual(self.hass.states.get(renamed).state, self.runtime.images["workout"].updated_at.isoformat())
+            self.assertEqual(self.hass.states.get(renamed).attributes["workout_type"], "Walking")
 
         await component.async_remove_entity(renamed)
         # Options may change the username; a saved registry ID still belongs to HA.

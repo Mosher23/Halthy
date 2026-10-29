@@ -129,13 +129,13 @@ For UTC-looking timestamps, absolute date formatting, missing statistics, or HAC
 
 With an updated Halthy iOS app, selecting a sleep metric for upload also creates three sensors for each user:
 
-- **Go to bed time** (`sensor.<username>_go_to_bed_time`): the start of recorded in-bed time associated with falling asleep. It is **unknown** if no matching in-bed record exists, rather than estimated from sleep duration.
+- **Go to bed time** (`sensor.<username>_go_to_bed_time`): the start of recorded in-bed time associated with falling asleep. If matching in-bed records are missing, the app uses the selected sleep session's start as an **estimate**.
 - **Fall asleep time** (`sensor.<username>_fall_asleep_time`): the first recorded asleep stage in the selected sleep session.
 - **Wake up time** (`sensor.<username>_wake_up_time`): the end of the final recorded asleep stage in that session, not the time you left bed.
 
-All three refer to the same latest main sleep session within the app's 48-hour lookback. Sleep stages and gaps of up to 90 minutes are grouped together; overlapping samples are merged. Sessions of at least two hours are preferred over short naps, with a 20-minute minimum fallback when no main session is found. These are recorded sleep boundaries, not live detection of whether you are currently asleep.
+All three refer to the same latest main sleep session within the app's 48-hour lookback. Sleep stages and gaps of up to 90 minutes are grouped together; overlapping samples are merged. Sessions of at least two hours are preferred over short naps, with a 20-minute minimum fallback when no main session is found. These summarize available sleep records, with an explicitly labelled bedtime estimate when needed; they do not detect whether you are currently asleep.
 
-The sensors contain full timezone-aware timestamps and use Home Assistant's timestamp display. They update on the next app upload, even if total sleep duration is unchanged. A newer session without in-bed data clears the previous bedtime to unknown. If the app cannot read a session, existing values remain unchanged. Update both the app and integration; earlier app versions send durations without these boundaries. No additional permission beyond access to sleep data is needed.
+The sensors contain full timezone-aware timestamps and use Home Assistant's timestamp display. They update on the next app upload, even if total sleep duration is unchanged. **Go to bed time** and **Sleep in bed** use the same calculation: recorded in-bed intervals take priority; otherwise both use the selected sleep session's boundaries, including awakenings and gaps. Their attributes expose `estimated`, `value_source` (`healthkit_in_bed` or `sleep_session_estimate`), `in_bed_start`, and `in_bed_end`. An estimated bedtime does not establish when you physically got into bed. If the app cannot read a session, existing values remain unchanged. Update both the app and integration to receive this behaviour and source information. No additional permission beyond access to sleep data is needed.
 
 ### Height and Weight sensor settings
 

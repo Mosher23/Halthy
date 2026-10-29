@@ -95,7 +95,7 @@ class SensorEntityTests(unittest.TestCase):
             self.assertEqual(sensor.native_unit_of_measurement, "min")
         pickups, _ = self.make_sensor("pickups_without_app_use", 4, "count")
         self.assertEqual(pickups.state_class, SensorStateClass.MEASUREMENT)
-        self.assertEqual(pickups.native_unit_of_measurement, "count")
+        self.assertIsNone(pickups.native_unit_of_measurement)
         first_pickup, original = self.make_sensor(
             "first_pickup_time", "2026-09-08T21:24:40Z", None
         )

@@ -7,6 +7,22 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-29
+
+### Fixed
+
+- Align Go to bed time and Sleep in bed with a shared calculation in the app. Prefer recorded HealthKit in-bed intervals; otherwise use the selected sleep-session window as an explicit estimate, including awakenings and gaps. Both sensors expose source and boundary attributes. Requires an updated iOS app.
+- Accept corrected sleep-source attributes even when the value and measurement timestamp are unchanged, so later recorded data can replace an estimate.
+- Refresh Workout start and Workout end from the latest stored workout, including calendar-only uploads and startup recovery. Preserve existing entity IDs and prevent older history from replacing newer workout times.
+- Preserve the workout image entity when current image bytes are missing or a map has been cleared. Retain its stable identity across restarts and reuse it when a replacement arrives, without restoring cleared image data.
+- Display the workout image entity's state as the workout finish timestamp instead of a workout-type string, avoiding Home Assistant's "Invalid timestamp" message. Keep the type in `workout_type` and refresh the picture URL for re-rendered maps.
+- Remove the literal `count` unit from counters and event totals, including restored entities. Preserve meaningful units such as steps, floors, bpm, and rates.
+
+### Compatibility
+
+- Update the integration and restart Home Assistant for the workout and counter fixes. Updated sleep calculation and source attributes also require the updated iOS app and a new upload; this integration release does not update the app itself.
+- Retains the v0.2.6 HACS review fixes for asynchronous time-zone loading and preservation of user-selected entity IDs.
+
 ## [0.2.6] - 2026-10-28
 
 ### Fixed
