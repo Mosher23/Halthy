@@ -2,6 +2,7 @@
 # Render the two canonical Markdown documents and the user guide without runtime JS.
 require 'cgi'
 require 'pathname'
+require 'json'
 ROOT = Pathname.new(__dir__).join('../..').realpath
 DOCS = ROOT.join('docs')
 CHECK = ARGV.include?('--check')
@@ -117,5 +118,44 @@ pages.each do |name, source, title, lead, label, current|
     target.write(html)
     puts "Rendered #{target.relative_path_from(ROOT)}"
   end
+end
+releases = JSON.parse(DOCS.join('releases.json').read).fetch('releases')
+release_nav = releases.map { |r| "<a href=\"#v#{r.fetch('version').tr('.', '-')}\"><span>v#{escape(r.fetch('version'))}</span><small>#{escape(r.fetch('date_label'))}</small></a>" }.join
+entries = releases.each_with_index.map do |r, index|
+  id = "v#{r.fetch('version').tr('.', '-')}"
+  groups = r.fetch('groups').map do |g|
+    items = g.fetch('items').map { |item| "<li>#{escape(item)}</li>" }.join
+    "<section class=\"release-group\"><p class=\"release-category\">#{escape(g.fetch('label'))}</p><h3>#{escape(g.fetch('title'))}</h3><ul>#{items}</ul></section>"
+  end.join
+  visual = r['image'] ? "<figure class=\"release-visual\"><img src=\"#{escape(r.fetch('image'))}\" width=\"720\" height=\"1565\" alt=\"#{escape(r.fetch('image_alt'))}\" fetchpriority=\"high\"><figcaption>Halthy 1.2 / demonstration data</figcaption></figure>" : ''
+  <<~HTML
+    <article class="release-entry#{index.zero? ? ' release-featured' : ''}" id="#{id}" aria-labelledby="#{id}-title">
+    <div class="release-rail"><a class="release-version" href="##{id}" aria-label="Link to version #{escape(r.fetch('version'))}">#{escape(r.fetch('version'))}</a><time datetime="#{escape(r.fetch('date'))}">#{escape(r.fetch('date_label'))}</time><span class="release-kind#{r.fetch('status') == 'planned' ? ' is-planned' : ''}">#{escape(r.fetch('label'))}</span></div>
+    <div class="release-card"><div class="release-intro#{visual.empty? ? '' : ' has-visual'}"><div><p class="eyebrow">#{index.zero? ? 'THE NEXT CHAPTER' : 'THE STORY SO FAR'}</p><h2 id="#{id}-title">#{escape(r.fetch('title'))}</h2><p class="release-summary">#{escape(r.fetch('summary'))}</p>#{index.zero? ? '<a class="text-link" href="documentation.html">Explore the Halthy guide <span aria-hidden="true">&#8599;</span></a>' : ''}</div>#{visual}</div><div class="release-groups">#{groups}</div><p class="release-note">#{escape(r.fetch('note'))}</p></div></article>
+  HTML
+end.join
+changelog_header = header.sub('href="changelog.html"', 'href="changelog.html" aria-current="page"')
+changelog_html = <<~HTML
+  <!doctype html>
+  <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Halthy Changelog - Every update, thoughtfully made</title><meta name="description" content="What's new in Halthy for iPhone. Explore release dates, design changes, features and improvements in versions 1.0, 1.1 and 1.2.">
+  <meta name="theme-color" content="#151a22"><meta name="referrer" content="strict-origin-when-cross-origin"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <link rel="canonical" href="https://mosher23.github.io/Halthy/changelog.html"><link rel="icon" href="assets/app-icon.png"><link rel="stylesheet" href="assets/site.css">
+  <meta property="og:type" content="website"><meta property="og:title" content="Halthy - The story keeps getting better"><meta property="og:description" content="A record of the features, refinements and little details that make Halthy better."><meta property="og:url" content="https://mosher23.github.io/Halthy/changelog.html">
+  </head><body><a class="skip-link" href="#main">Skip to content</a>#{changelog_header}<main id="main">
+  <header class="wrap changelog-heading"><p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>HALTHY / CHANGELOG</p><h1>The story keeps<br><span>getting better.</span></h1><div class="changelog-lead"><p class="lead">New ideas. Thoughtful refinements. The little details that make Halthy feel more like you. Here&#8217;s everything that&#8217;s changing.</p><span class="changelog-count">03<span>chapters so far</span></span></div></header>
+  <nav class="wrap release-jump" aria-label="Jump to a release">#{release_nav}</nav>
+  <div class="wrap release-timeline">#{entries}</div>
+  <aside class="wrap changelog-end"><span class="release-end-mark" aria-hidden="true">&#10022;</span><h2>Made better, together.</h2><p>Have an idea, a small frustration or something you&#8217;d love to see next? We&#8217;re listening.</p><a class="button secondary" href="support.html">Share your feedback <span aria-hidden="true">&#8599;</span></a></aside>
+  </main>#{footer}</body></html>
+HTML
+target = DOCS.join('changelog.html')
+if CHECK
+  if !target.exist? || target.read != changelog_html
+    warn "Out of date: #{target}"; failed = true
+  end
+else
+  target.write(changelog_html)
+  puts "Rendered #{target.relative_path_from(ROOT)}"
 end
 exit 1 if failed

@@ -10,9 +10,10 @@ are needed.
 - Landing page: `docs/index.html`.
 - Shared design and responsive layouts: `docs/assets/site.css`.
 - Guide source: `docs/guide.md`.
+- App release notes: `docs/releases.json`; the generator renders `docs/changelog.html` with dates, release status and a version timeline. Keep planned releases labelled until availability is confirmed.
 - Support source: repository-root `SUPPORT.md`.
 - Privacy source: repository-root `PRIVACY.md`.
-- Regenerate the three document pages with
+- Regenerate the document pages and changelog with
   `ruby .github/scripts/build_site_documents.rb` after source, header or footer edits.
 - Validate with `ruby .github/scripts/build_site_documents.rb --check` and
   `python3 .github/scripts/check_site.py`.
@@ -50,6 +51,14 @@ Images are optimized WebP copies of the approved PNGs, resized without cropping
 or stretching. `app-icon.png` retains Halthy's existing icon. Source assets remain
 in the private app workspace; do not publish private app sources, personal
 screenshots, debug exports or credentials to this repository.
+
+The changelog's `release-1-2-dashboard.webp` is a resized current v1.2 Simulator
+capture with synthetic health values and a public demonstration route. The
+initial release and v1.1 dates follow Apple's public Version History (September
+24 and October 26, 2026). The v1.1 text follows its published release notes; v1.2
+notes describe the implemented grouped Settings, shared icon treatment, setup,
+replay and data-handling refinements. October 30 is the developer's planned v1.2
+release date, not a claim of confirmed App Store availability.
 
 The gallery opens each image directly for enlargement. Documentation is usable
 without JavaScript, keyboard navigation has focus indicators, motion respects

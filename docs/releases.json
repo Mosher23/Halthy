@@ -1,0 +1,74 @@
+{
+  "releases": [
+    {
+      "version": "1.2",
+      "date": "2026-10-30",
+      "date_label": "October 30, 2026",
+      "status": "planned",
+      "label": "Planned release",
+      "title": "A calmer look. A clearer everyday.",
+      "summary": "A more consistent design, simpler Settings and thoughtful refinements to the way you explore, export and connect your data.",
+      "image": "assets/release-1-2-dashboard.webp",
+      "image_alt": "Halthy 1.2 main dashboard with outlined category icons, health readings and a running route using demonstration data",
+      "groups": [
+        {"label": "Design", "title": "One look, throughout the app", "items": [
+          "A shared icon style brings subtle fills and clear, colourful outlines to the dashboard, Settings, setup and workout replay.",
+          "Compact status popovers make connection and upload details easier to read. Clearer outlines also respond to Increase Contrast."
+        ]},
+        {"label": "Improved", "title": "Less friction. More flow.", "items": [
+          "Settings is organised into Connections, Health & data, and Preferences, with compact grouped rows and clearer connection feedback.",
+          "Open Export directly from Settings. Setup screens and replay controls now share the same visual language, and workout icons reflect the actual activity."
+        ]},
+        {"label": "Refined", "title": "The details matter", "items": [
+          "Technical log details expand inline, keeping repeated events compact while retaining filters and CSV sharing.",
+          "Further improvements to workout-upload recovery and sleep time-in-bed handling make recorded data and connection problems easier to understand."
+        ]}
+      ],
+      "note": "Planned for October 30. App Store availability follows release and may vary by region."
+    },
+    {
+      "version": "1.1",
+      "date": "2026-10-26",
+      "date_label": "October 26, 2026",
+      "status": "released",
+      "label": "Feature update",
+      "title": "A fresh perspective on your health.",
+      "summary": "Refreshed themes, richer workout replay and more control over the health data you choose to explore and share.",
+      "groups": [
+        {"label": "New look", "title": "A dashboard that feels like you", "items": [
+          "Redesigned light and dark themes, patterned backgrounds and clearer dashboard controls.",
+          "Recorded sleep stages with durations and percentages when available, plus easier access to Dietary Energy in health-data selection."
+        ]},
+        {"label": "Workouts", "title": "Revisit the effort", "items": [
+          "Improved workout replay, satellite-map readability and weather overlays.",
+          "Reorganised Settings and setup, including Home Assistant sign-in and Digital Health configuration for eligible users."
+        ]},
+        {"label": "Reliability", "title": "Clearer feedback. Smoother sync.", "items": [
+          "Improved background upload handling for HealthKit, eligible Digital Health readings and InfluxDB, with additional sync and stability improvements.",
+          "More readable technical logs with timestamped CSV export and system sharing, clearer connection-test feedback and more reliable status-badge outlines."
+        ]}
+      ],
+      "note": "Background uploads depend on iOS scheduling and data availability. Digital Health requires an eligible EU device and Apple Account, iOS 26.4 or later, and separate permission."
+    },
+    {
+      "version": "1.0",
+      "date": "2026-09-24",
+      "date_label": "September 24, 2026",
+      "status": "released",
+      "label": "The first release",
+      "title": "Your workouts. Your health. Your data.",
+      "summary": "The beginning of Halthy: a personal view of Apple Health, with tools to revisit your workouts and take selected data wherever you want it to go.",
+      "groups": [
+        {"label": "Explore", "title": "Your daily perspective", "items": [
+          "A customisable health dashboard with selected metrics, charts, trends and sleep summaries from Apple Health.",
+          "A workout calendar, route maps and replay, with shareable workout images and videos when the required workout data is available."
+        ]},
+        {"label": "Export & connect", "title": "Always on your terms", "items": [
+          "Local CSV and PDF exports, plus GPX files for recorded workout routes.",
+          "Optional connections to your own Home Assistant and InfluxDB, without a Halthy account or Halthy-operated health-data server."
+        ]}
+      ],
+      "note": "The 1.0.1 maintenance update also arrived on September 24, improving interface performance, iPhone layouts, queued uploads and general stability."
+    }
+  ]
+}

@@ -4,11 +4,13 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import sys
+import json
+from datetime import date
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / 'docs'
-PAGES = ('index.html', 'documentation.html', 'support.html', 'privacy.html')
+PAGES = ('index.html', 'documentation.html', 'support.html', 'privacy.html', 'changelog.html')
 SITE = 'https://mosher23.github.io/Halthy/'
 checks = 0
 
@@ -97,6 +99,22 @@ def validate():
     sitemap = ET.parse(DOCS / 'sitemap.xml')
     locations = {entry.text for entry in sitemap.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')}
     check(locations == {SITE, *(SITE + name for name in PAGES[1:])}, 'Sitemap does not match public pages')
+    releases = json.loads((DOCS / 'releases.json').read_text())['releases']
+    versions = [release['version'] for release in releases]
+    check(len(versions) == len(set(versions)), 'Duplicate app release version')
+    release_dates = [date.fromisoformat(release['date']) for release in releases]
+    check(release_dates == sorted(release_dates, reverse=True), 'Releases must be newest first')
+    changelog = (DOCS / 'changelog.html').read_text()
+    for release in releases:
+        version, status = release['version'], release['status']
+        check(status in ('planned', 'released'), f'{version}: unknown release status')
+        check(f'v{version.replace(".", "-")}' in parsed['changelog.html'].ids, f'{version}: release anchor missing')
+        check(f'datetime="{release["date"]}"' in changelog, f'{version}: release date missing')
+        check(release['date_label'] in changelog, f'{version}: visible release date missing')
+        check(status != 'planned' or release['label'] == 'Planned release', f'{version}: planned release must be clearly labelled')
+        check(bool(release['groups']) and all(group['items'] for group in release['groups']), f'{version}: release notes empty')
+    for name, page in parsed.items():
+        check('changelog.html' in page.links, f'{name}: changelog navigation missing')
     css = (DOCS / 'assets/site.css').read_text()
     check('prefers-reduced-motion' in css, 'Reduce Motion support missing')
     check(':focus-visible' in css, 'Keyboard focus styling missing')
