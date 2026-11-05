@@ -52,13 +52,17 @@
 <section id="home-assistant">
 <h2>Home Assistant</h2>
 <h3 id="install-the-companion-integration">Install the companion integration</h3>
+<p>On <strong>Home Assistant 2026.11 or later</strong>, use the built-in <strong>Home Assistant Marketplace</strong>. Halthy is in the community catalog, so no custom repository or GitHub account is needed.</p>
 <ol>
-<li>Open <strong>HACS &gt; Integrations</strong> in your Home Assistant instance.</li>
-<li>If needed, add <code>https://github.com/Mosher23/Halthy</code> as a custom repository with category <strong>Integration</strong>.</li>
-<li>Install Halthy and <strong>restart Home Assistant</strong>.</li>
-<li>Open <strong>Settings &gt; Devices &amp; services &gt; Add integration</strong>, search for <strong>Halthy</strong>, and create a profile for each person.</li>
+<li>Open <strong>Settings &gt; Marketplace</strong> as a Home Assistant administrator.</li>
+<li>Search for <strong>Halthy</strong>, open its listing and select <strong>Install</strong>.</li>
+<li>Complete the setup flow that opens automatically. A first installation does <strong>not</strong> require a restart.</li>
 <li>Choose a username and, optionally, a display name. For manual-token setups, the app username must match the integration profile.</li>
+<li>Add more people under <strong>Settings &gt; Devices &amp; services &gt; Add integration &gt; Halthy</strong>.</li>
 </ol>
+<p>Updates appear under <strong>Settings &gt; Updates</strong> and still require a restart when prompted. Existing HACS installations migrate to Marketplace when Home Assistant is upgraded; there is no need to uninstall Halthy or recreate your profiles. See the <a href="https://www.home-assistant.io/blog/2026/11/04/release-202611/#welcome-to-the-marketplace">Marketplace announcement</a>.</p>
+<p>On <strong>Home Assistant 2026.10 or earlier</strong>, search for <strong>Halthy</strong> in your existing HACS installation, download it, restart Home Assistant, then add <strong>Halthy</strong> under <strong>Settings &gt; Devices &amp; services &gt; Add integration</strong>.</p>
+<p>Halthy is supported by its community maintainer, not by the Home Assistant project. Marketplace availability does not make it a built-in Home Assistant Core integration.</p>
 <p>For a manual installation, copy only <code>custom_components/halthy</code> from the <a href="https://github.com/Mosher23/Halthy">integration repository</a> into your Home Assistant configuration&#39;s <code>custom_components</code> directory, then restart and add the integration.</p>
 <h3 id="connect-the-iphone-app">Connect the iPhone app</h3>
 <p>In <strong>Settings &gt; Home Assistant</strong>, use the connection setup to choose Home Assistant sign-in or an access token. Native sign-in takes place on your own Home Assistant server, not this website. Use a compatible updated app and integration for native sign-in and device pairing.</p>

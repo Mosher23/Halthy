@@ -102,19 +102,23 @@ To combine samples that arrive in different batches, the integration keeps a ded
 
 ## 🧩 Install and Setup
 
-### 🛒 Install from HACS (Preferred)
+### 🛒 Install from Home Assistant Marketplace (Preferred)
 
-1. Open **HACS**.
-2. Go to **Integrations** and add this repository as a custom integration repository if needed:
-   - `https://github.com/Mosher23/Halthy`
-3. Install **Halthy**.
-4. Restart Home Assistant.
-5. Go to **Settings -> Devices & Services -> Add Integration**.
-6. Select **Halthy**.
-7. Enter:
-   - **Username** (must match the iOS app username)
-   - **Display Name** (optional)
-8. Repeat per person.
+On **Home Assistant 2026.11 or later**, Marketplace is built in. Halthy is included in the community catalog; you do not need to add a custom repository or sign in to GitHub.
+
+1. As a Home Assistant administrator, open **Settings -> Marketplace**.
+2. Search for **Halthy**, open its listing, and select **Install**.
+3. Follow the setup flow that opens automatically. A first installation does **not** require a restart.
+4. Enter a **Username** and an optional **Display Name**. For manual-token connections, use the same username in the iOS app.
+5. To add another person later, open **Settings -> Devices & services -> Add integration -> Halthy**.
+
+Updates appear under **Settings -> Updates**. After updating, restart Home Assistant when prompted. Existing HACS installations migrate to Marketplace when Home Assistant is upgraded; do not uninstall Halthy or recreate your profiles.
+
+Marketplace replaces HACS starting with Home Assistant 2026.11. See the [Marketplace announcement](https://www.home-assistant.io/blog/2026/11/04/release-202611/#welcome-to-the-marketplace) for details. Halthy remains a community-supported custom integration, not a built-in Home Assistant Core integration.
+
+### Older Home Assistant Versions (HACS)
+
+On **Home Assistant 2026.10 or earlier**, use your existing HACS installation: search for **Halthy**, download it, restart Home Assistant, then add **Halthy** under **Settings -> Devices & services -> Add integration**.
 
 ### 🧰 Manual Install
 
@@ -125,7 +129,7 @@ To combine samples that arrive in different batches, the integration keeps a ded
 
 ### Sleep times
 
-For UTC-looking timestamps, absolute date formatting, missing statistics, or HACS icon placeholders, see [Troubleshooting](docs/troubleshooting.md).
+For UTC-looking timestamps, absolute date formatting, missing statistics, or Marketplace icon placeholders, see [Troubleshooting](docs/troubleshooting.md).
 
 With an updated Halthy iOS app, selecting a sleep metric for upload also creates three sensors for each user:
 

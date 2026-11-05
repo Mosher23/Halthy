@@ -18,7 +18,20 @@ node tests/workout_card_gymkit.test.cjs
 git diff --check
 ```
 
-HACS validation and Hassfest must pass before a change is released.
+Marketplace validation (using the HACS action) and Hassfest must pass before a change is released.
+
+## Marketplace Compatibility
+
+Halthy is listed in Home Assistant Marketplace, built into Home Assistant starting
+with 2026.11. Keep the repository's `hacs.json`, `hacs/action` validation, and
+`halthy.zip` release asset: Marketplace still uses these publishing interfaces.
+The workflow and script paths containing `hacs` are retained for compatibility;
+historical release notes retain the terminology used at the time.
+
+Use Marketplace in current user-facing instructions. Keep HACS instructions
+explicitly scoped to Home Assistant 2026.10 and earlier. First Marketplace
+installs open the integration's config flow without a restart; updates still
+require one. See the [Marketplace publishing documentation](https://contributors.home-assistant.io/marketplace/).
 
 ## Reporting Problems
 

@@ -39,11 +39,19 @@ File export is separate from automatic synchronization. A file goes only to the 
 
 ### Install the companion integration
 
-1. Open **HACS > Integrations** in your Home Assistant instance.
-2. If needed, add `https://github.com/Mosher23/Halthy` as a custom repository with category **Integration**.
-3. Install Halthy and **restart Home Assistant**.
-4. Open **Settings > Devices & services > Add integration**, search for **Halthy**, and create a profile for each person.
-5. Choose a username and, optionally, a display name. For manual-token setups, the app username must match the integration profile.
+On **Home Assistant 2026.11 or later**, use the built-in **Home Assistant Marketplace**. Halthy is in the community catalog, so no custom repository or GitHub account is needed.
+
+1. Open **Settings > Marketplace** as a Home Assistant administrator.
+2. Search for **Halthy**, open its listing and select **Install**.
+3. Complete the setup flow that opens automatically. A first installation does **not** require a restart.
+4. Choose a username and, optionally, a display name. For manual-token setups, the app username must match the integration profile.
+5. Add more people under **Settings > Devices & services > Add integration > Halthy**.
+
+Updates appear under **Settings > Updates** and still require a restart when prompted. Existing HACS installations migrate to Marketplace when Home Assistant is upgraded; there is no need to uninstall Halthy or recreate your profiles. See the [Marketplace announcement](https://www.home-assistant.io/blog/2026/11/04/release-202611/#welcome-to-the-marketplace).
+
+On **Home Assistant 2026.10 or earlier**, search for **Halthy** in your existing HACS installation, download it, restart Home Assistant, then add **Halthy** under **Settings > Devices & services > Add integration**.
+
+Halthy is supported by its community maintainer, not by the Home Assistant project. Marketplace availability does not make it a built-in Home Assistant Core integration.
 
 For a manual installation, copy only `custom_components/halthy` from the [integration repository](https://github.com/Mosher23/Halthy) into your Home Assistant configuration's `custom_components` directory, then restart and add the integration.
 

@@ -12,7 +12,7 @@ fi
 staging_directory="$(mktemp -d)"
 trap 'rm -rf "${staging_directory}"' EXIT
 
-# HACS extracts release ZIP contents directly into custom_components/halthy.
+# Marketplace and legacy HACS extract ZIP contents into custom_components/halthy.
 cp -R "${repository_root}/custom_components/halthy/." "${staging_directory}/"
 rm -rf "${staging_directory}/tests"
 find "${staging_directory}" -name '.DS_Store' -delete
@@ -35,13 +35,13 @@ for required_file in __init__.py manifest.json strings.json brand/icon.png brand
 done
 
 if grep -Eq '^custom_components(/|$)' <<<"${archive_contents}"; then
-  echo "Invalid HACS archive: custom_components must not be inside the release ZIP." >&2
+  echo "Invalid Marketplace archive: custom_components must not be inside the release ZIP." >&2
   exit 1
 fi
 
 if grep -Eq '(^|/)(tests|__pycache__)(/|$)|(^|/)\.DS_Store$|\.py[co]$' <<<"${archive_contents}"; then
-  echo "Invalid HACS archive: development or generated files are included." >&2
+  echo "Invalid Marketplace archive: development or generated files are included." >&2
   exit 1
 fi
 
-echo "Built valid HACS package: ${output_path}"
+echo "Built valid Marketplace package: ${output_path}"

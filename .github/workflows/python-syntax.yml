@@ -31,7 +31,7 @@ jobs:
       - name: Test GymKit workout card metadata and escaping
         run: node tests/workout_card_gymkit.test.cjs
 
-      - name: Validate HACS release package layout
+      - name: Validate Marketplace release package layout
         run: .github/scripts/build_hacs_package.sh /tmp/halthy.zip
 
       - name: Install Home Assistant for sensor compatibility tests

@@ -109,12 +109,14 @@ Historical samples and retries now reach statistics processing even when they ar
 
 After updating, resend the missing history from the app. The integration cannot recover data it never received. If the series remains missing, include the Home Assistant version, whether statistics are enabled for that person, the affected statistic ID, and recorder/Halthy error messages with your report. A successful queue submission is not proof that the recorder database write has completed.
 
-## Icon missing in the HACS repository list
+## Icon missing in the Marketplace listing
 
 The installation ZIP includes `brand/icon.png` and `brand/icon@2x.png`. Package validation requires both. Home Assistant supports local custom-integration brand images starting with 2026.3.
 
-The HACS frontend version investigated still requests repository-list icons from `brands.home-assistant.io`. Halthy's public icon currently returns 404, so that listing can show a placeholder even when the local integration icon is installed correctly. Adding another image to this repository or changing the README does not change that external lookup.
+The Marketplace listing and the installed integration use separate image lookups. For catalog integrations, the public brands service picks up the bundled `brand/` images from the latest release. A newly accepted entry or changed icon can take time to appear in the public listing and browser caches. See the [Marketplace integration publishing guide](https://contributors.home-assistant.io/marketplace/guides/integrations/).
 
-Resolving that listing requires a HACS version supporting local brand images or an accepted public brands entry. Halthy cannot replace HACS's icon URL from its own manifest. For the installed integration's icon, use Home Assistant 2026.3 or newer and restart after installation.
+Refresh the listing and browser before reinstalling anything. If the placeholder persists, report your Home Assistant version, integration version, and whether the missing icon is in Marketplace or **Devices & services**. Changing a README image cannot repair the listing's external image lookup.
+
+On Home Assistant 2026.10 or earlier, older HACS frontends can also show a placeholder when their public brands lookup has not picked up the icon. For the installed integration's local icon, use Home Assistant 2026.3 or newer. Restart after updates; a first Marketplace installation on 2026.11 or later does not require a restart.
 
 See [Home Assistant brand-image documentation](https://developers.home-assistant.io/docs/core/integration/brand_images/).

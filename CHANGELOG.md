@@ -7,6 +7,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Documentation
+
+- Update both READMEs, the website setup guide, icon troubleshooting and contributor guidance for Home Assistant Marketplace in 2026.11. Halthy is now in the community catalog; a custom repository is no longer needed. Distinguish restart-free first installs from updates that still require a restart, and retain legacy HACS instructions for older Home Assistant versions.
+- Update validation and packaging labels to Marketplace while retaining the required `hacs.json`, HACS action, release ZIP layout and existing workflow/script paths. Integration runtime and minimum supported version are unchanged.
+
 ## [0.2.8] - 2026-10-29
 
 ### Fixed

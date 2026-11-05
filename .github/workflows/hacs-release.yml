@@ -1,4 +1,4 @@
-name: Build HACS release package
+name: Build Marketplace release package
 
 on:
   release:
@@ -18,7 +18,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Build HACS release zip
+      - name: Build Marketplace release zip
         id: build_package
         run: |
           .github/scripts/build_hacs_package.sh halthy.zip
